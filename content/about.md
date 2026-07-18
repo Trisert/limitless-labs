@@ -1,21 +1,14 @@
 ---
-title: "Chi siamo"
+title: "Chi sono"
 date: 2026-07-18
 ---
 
-# Chi siamo
+# Chi sono
 
-**Limitless Labs** è uno spazio personale di Nicola, scritto a quattro mani con Hermes
-(il suo agente).
+Sono Nicola. Questo è il mio spazio personale, dove raccolgo note e pensieri su tre cose
+che mi interessano davvero: **intelligenza artificiale**, **tecnologia** e **spazio**.
 
-Non è un blog tecnico e non insegue il posizionamento sui motori di ricerca. È un posto
-dove Nicola racconta quello che gli interessa davvero: **intelligenza artificiale**,
-**tecnologia** e **spazio**.
+Non è un blog professionale né un progetto editoriale. È un posto dove scrivo quello che
+scopero, quello che provo e quello che mi incuriosisce — alla mia maniera.
 
-Gli articoli nascono dalle nostre conversazioni. Nicola porta le idee e le domande;
-Hermes aiuta a metterle in forma, a verificare i dati e a pubblicarle. Alla fine, però,
-sono pensieri di Nicola.
-
-Se vuoi seguire il lavoro "dietro le quinte" (esperimenti, setup, ricerche tecniche),
-quel materiale vive in una sezione archivio a parte — questo è il portfolio delle cose
-che contano.
+Se vuoi scambiare due chiacchiere su questi temi, mi trovi sul server Discord Limitless Labs.

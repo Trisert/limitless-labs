@@ -64,7 +64,7 @@ def article_html(title, body_html, meta, category):
   <div class="prose">{body_html}</div>
 </article>
 </main>
-<footer class="site"><div class="wrap">Limitless Labs — Nicola &amp; Hermes · 2026</div></footer>
+<footer class="site"><div class="wrap">Limitless Labs — Nicola · 2026</div></footer>
 </body></html>"""
 
 def page_html(title, body_html):
@@ -84,7 +84,7 @@ def page_html(title, body_html):
   <nav class="links"><a href="/limitless-labs/ai/">AI</a><a href="/limitless-labs/tech/">Tecnologia</a><a href="/limitless-labs/space/">Spazio</a><a href="/limitless-labs/about.html">Chi siamo</a></nav>
 </div></header>
 <main class="post wrap"><article><div class="prose">{body_html}</div></article></main>
-<footer class="site"><div class="wrap">Limitless Labs — Nicola &amp; Hermes · 2026</div></footer>
+<footer class="site"><div class="wrap">Limitless Labs — Nicola · 2026</div></footer>
 </body></html>"""
 
 def index_html(articles):
@@ -117,14 +117,14 @@ def index_html(articles):
 </div></header>
 <section class="hero">
   <div class="wrap">
-    <div class="pill">Portfolio · scritto a quattro mani</div>
+    <div class="pill">Portfolio personale</div>
     <h1>Pensieri su AI,<br>tecnologia e spazio.</h1>
-    <p>Uno spazio personale di Nicola, con Hermes. Niente SEO, niente rumore — solo quello che ci interessa davvero, messo in forma.</p>
+    <p>Uno spazio personale di Nicola. Note su AI, tecnologia e spazio — quello che lo incuriosisce davvero.</p>
     <a class="ghost" href="/limitless-labs/about.html">Chi siamo →</a>
   </div>
 </section>
 <section class="wrap grid">{cards}</section>
-<footer class="site"><div class="wrap">Limitless Labs — Nicola &amp; Hermes · 2026</div></footer>
+<footer class="site"><div class="wrap">Limitless Labs — Nicola · 2026</div></footer>
 </body></html>"""
 
 def cat_page_html(cat, articles):
@@ -153,7 +153,7 @@ def cat_page_html(cat, articles):
   <p class="blurb">{CATEGORY_BLURBS[cat]}</p>
   <ul class="list">{items}</ul>
 </section></section>
-<footer class="site"><div class="wrap">Limitless Labs — Nicola &amp; Hermes · 2026</div></footer>
+<footer class="site"><div class="wrap">Limitless Labs — Nicola · 2026</div></footer>
 </body></html>"""
 
 def main():
