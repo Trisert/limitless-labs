@@ -1,5 +1,8 @@
 // scroll.js — IntersectionObserver reveal + parallax on hero text
 (function () {
+  // Mark JS as available so CSS can safely hide .reveal only when we can reveal them.
+  document.documentElement.classList.add('js');
+
   var reduceMotion = window.matchMedia &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -19,7 +22,7 @@
     els.forEach(function (e) { io.observe(e); });
   }
 
-  // Subtle parallax of hero text relative to scroll
+  // Subtle parallax of hero TEXT (.hero .wrap) relative to scroll
   if (!reduceMotion) {
     var hero = document.querySelector('.hero-3d .wrap');
     window.addEventListener('scroll', function () {

@@ -2,6 +2,7 @@
 // Earth + orbital rings of satellites, drag to rotate, scroll to descend slightly.
 import * as THREE from 'three';
 
+try {
 const canvas = document.getElementById('orbitCanvas');
 const reduceMotion = window.matchMedia &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -172,4 +173,9 @@ const hint = document.getElementById('heroHint');
 if (hint) {
   window.addEventListener('pointerdown', () => hint.style.opacity = '0', { once: true });
   setTimeout(() => { if (hint) hint.style.opacity = '0'; }, 6000);
+}
+
+} catch (err) {
+  // WebGL unavailable or Three failed to load: leave the CSS gradient background.
+  console.warn('hero3d disabled:', err);
 }
