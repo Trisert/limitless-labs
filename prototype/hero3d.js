@@ -75,6 +75,8 @@ const RING_DEFS = [
   { radius: 3.8, count: 11, tilt: 0.9, color: 0xd6dee5, speed: 0.10 },
 ];
 
+const rings = [];
+
 RING_DEFS.forEach(def => {
   const group = new THREE.Group();
   group.rotation.x = def.tilt;
