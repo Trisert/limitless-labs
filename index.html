@@ -522,8 +522,8 @@
     pulses = [];
   }
   function initRealSatellites(data){
-    // data.sats: [[x,y,z],...] in Earth radii (TEME/ECI)
-    satellites = data.sats.map(function(v){ return { bx: v[0], by: v[1], bz: v[2], sx: 0, sy: 0, depth: 0, raan: 0, M0: 0 }; });
+    // data.sats: [[x,y,z,alt_km],...] in Earth radii + altitude
+    satellites = data.sats.map(function(v){ return { bx: v[0], by: v[1], bz: v[2], alt: v[3] || 550, sx: 0, sy: 0, depth: 0, raan: 0, M0: 0 }; });
     planes = [];
     pulses = [];
   }
@@ -584,6 +584,12 @@
     lastPulseTime = time;
   }
   function depthAlpha(depth){ var n = (depth + ORBIT_R) / (2 * ORBIT_R); return Math.max(0.15, Math.min(1, n)); }
+  // 3 shells by altitude (km): low / mid / high
+  function shellColor(alt){
+    if (alt < 545) return 'rgba(111,147,172,';   // steel blue — low shell
+    if (alt < 555) return 'rgba(255,176,0,';     // amber — mid shell
+    return 'rgba(120,200,160,';                  // green — high/polar shell
+  }
   function draw(spin, links, realMode){
     ctx.clearRect(0, 0, W, H);
     var er = EARTH_RADIUS * scale;
@@ -614,8 +620,22 @@
     }
     for (var i = 0; i < satellites.length; i++){
       var s = satellites[i], da = depthAlpha(s.depth), r = 1.0 + da * 1.6;
-      ctx.fillStyle = NODE_COLOR + (0.3 + da * 0.6).toFixed(3) + ')';
+      var col = realMode ? shellColor(s.alt) : NODE_COLOR;
+      ctx.fillStyle = col + (0.3 + da * 0.6).toFixed(3) + ')';
       ctx.beginPath(); ctx.arc(s.sx, s.sy, r, 0, Math.PI * 2); ctx.fill();
+    }
+    if (realMode){
+      // legend
+      var ly = H - 64, lx = W - 168;
+      ctx.font = '11px "JetBrains Mono", monospace';
+      ctx.textBaseline = 'middle';
+      var legend = [['rgba(111,147,172,0.9)', 'Low shell ~540km'], ['rgba(255,176,0,0.9)', 'Mid shell ~550km'], ['rgba(120,200,160,0.9)', 'High shell ~560km']];
+      for (var li2 = 0; li2 < legend.length; li2++){
+        ctx.fillStyle = legend[li2][0];
+        ctx.beginPath(); ctx.arc(lx, ly + li2 * 16, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(155,161,171,0.9)';
+        ctx.fillText(legend[li2][1], lx + 10, ly + li2 * 16);
+      }
     }
     ctx.globalCompositeOperation = 'lighter';
     for (var pu = pulses.length - 1; pu >= 0; pu--){

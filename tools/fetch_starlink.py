@@ -26,9 +26,20 @@ def ensure_sgp4():
 
 
 def fetch_tle():
-    req = urllib.request.Request(URL, headers={"User-Agent": "limitless-labs/1.0"})
-    with urllib.request.urlopen(req, timeout=90) as r:
-        return r.read().decode("utf-8")
+    last_err = None
+    for attempt in range(3):
+        try:
+            req = urllib.request.Request(URL, headers={
+                "User-Agent": "Mozilla/5.0 (limitless-labs; nicola@trisert.dev)",
+                "Accept": "text/plain",
+            })
+            with urllib.request.urlopen(req, timeout=90) as r:
+                return r.read().decode("utf-8")
+        except Exception as e:
+            last_err = e
+            import time
+            time.sleep(5 * (attempt + 1))
+    raise RuntimeError(f"celestrak fetch failed: {last_err}")
 
 
 def parse_tles(text):
@@ -52,21 +63,32 @@ def main():
     now = datetime.now(timezone.utc)
     jd, fr = jday(now.year, now.month, now.day, now.hour, now.minute, now.second)
 
-    tles = parse_tles(fetch_tle())
-    step = max(1, len(tles) // MAX_SATS)
-    sats = []
-    for idx in range(0, len(tles), step):
-        _, l1, l2 = tles[idx]
-        sat = Satrec.twoline2rv(l1, l2)
-        err, r, _ = sat.sgp4(jd, fr)
-        if err != 0:
-            continue
-        x, y, z = r
-        sats.append([round(x / EARTH_R_KM, 4), round(y / EARTH_R_KM, 4), round(z / EARTH_R_KM, 4)])
+    try:
+        tles = parse_tles(fetch_tle())
+        step = max(1, len(tles) // MAX_SATS)
+        sats = []
+        for idx in range(0, len(tles), step):
+            _, l1, l2 = tles[idx]
+            sat = Satrec.twoline2rv(l1, l2)
+            err, r, _ = sat.sgp4(jd, fr)
+            if err != 0:
+                continue
+            x, y, z = r
+            radius_km = (x*x + y*y + z*z) ** 0.5
+            alt_km = radius_km - EARTH_R_KM
+            sats.append([round(x / EARTH_R_KM, 4), round(y / EARTH_R_KM, 4), round(z / EARTH_R_KM, 4), round(alt_km)])
+        if sats:
+            OUT.parent.mkdir(parents=True, exist_ok=True)
+            OUT.write_text(json.dumps({"updated": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "count": len(sats), "sats": sats}))
+            print(f"Wrote {len(sats)} satellites -> {OUT}")
+            return
+        print("no valid sats from celestrak, falling back")
+    except Exception as e:
+        print(f"celestrak failed ({e}), falling back to 3-shell generator")
 
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps({"updated": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "count": len(sats), "sats": sats}))
-    print(f"Wrote {len(sats)} satellites -> {OUT}")
+    # fallback: regenerate offline 3-shell snapshot
+    import subprocess
+    subprocess.run([sys.executable, str(Path(__file__).parent / "gen_fallback_starlink.py")], check=True)
 
 
 if __name__ == "__main__":
