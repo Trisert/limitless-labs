@@ -77,13 +77,24 @@ html.js .reveal{
   /* Hero: shorter so the 3D + text fit a phone screen without excessive scroll */
   .hero-3d{ padding: 64px 0 88px; min-height: 78vh; }
   .hero-3d h1{
-    font-size: clamp(30px, 9vw, 44px);
-    line-height: 1.08;
+    font-size: clamp(36px, 11vw, 52px);
+    line-height: 1.05;
     max-width: 100%;
   }
-  .hero-3d .hero-sub{ font-size: 15px; margin-top: 18px; }
-  .hero-3d .hero-cta{ margin-top: 26px; gap: 10px; }
-  .hero-3d .btn{ padding: 11px 18px; font-size: 13.5px; }
+  .hero-3d .hero-eyebrow{ font-size: 13px; }
+  .hero-3d .hero-sub{ font-size: 17px; line-height: 1.55; margin-top: 20px; }
+  .hero-3d .hero-cta{ margin-top: 28px; gap: 12px; }
+  .hero-3d .btn{ padding: 13px 22px; font-size: 15.5px; }
+
+  /* Section headings + body text bigger on mobile so nothing feels tiny */
+  h2{ font-size: 25px; }
+  .section-label{ font-size: 13px; }
+  .about-body p{ font-size: 16.5px; line-height: 1.6; }
+  .card h3{ font-size: 18px; }
+  .card p{ font-size: 14.5px; }
+  .log-title{ font-size: 18px; }
+  .log-date, .log-cat{ font-size: 11.5px; }
+  .prose p{ font-size: 17px; }
 
   /* No drag hint on touch (no cursor) */
   .hero-hint{ display: none; }
