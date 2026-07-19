@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Limitless Labs — Prototype</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../style.css">
+<link rel="stylesheet" href="style-proto.css">
+</head>
+<body>
+
+<div class="ticker" role="status" aria-label="status ticker">
+  <div class="ticker-track">
+    EPOCH 2026-07-10T14:02:11Z <span>|</span> INC 97.4&deg; <span>|</span> ALT 550.2 KM <span>|</span> RAAN 214.7&deg; <span>|</span> ECC 0.0012 <span>|</span> STATUS: NOMINAL <span>|</span> ORBITAL PERIOD 95.6 MIN <span>|</span> AOCS LOCK: ACQUIRED <span>|</span>
+  </div>
+</div>
+
+<div class="wrap">
+  <nav>
+    <div class="logo">LIMITLESS <span class="dim">LABS</span></div>
+    <div class="navlinks">
+      <a href="#about">About</a>
+      <a href="#projects">Projects</a>
+      <a href="#writing">Writing</a>
+      <a href="#contact">Contact</a>
+    </div>
+  </nav>
+</div>
+
+<!-- ===== HERO 3D ===== -->
+<section class="hero hero-3d" id="top">
+  <canvas class="hero-canvas" id="orbitCanvas" aria-hidden="true"></canvas>
+  <div class="hero-overlay"></div>
+  <div class="hero-hint" id="heroHint">drag to orbit &middot; scroll to descend</div>
+  <div class="wrap">
+    <div class="hero-eyebrow">STUDENT &middot; BUILDER &middot; EXPLORER</div>
+    <h1>I study the sky.<br>I build the <span class="accent">tools</span>.</h1>
+    <p class="hero-sub">Aerospace engineering student working on ESA-collaboration software, and tinkering with local LLMs and agents &mdash; when I'm away from the desk, I'm usually following sport, from the court to the track.</p>
+    <div class="hero-cta">
+      <a class="btn btn-primary" href="#projects">View projects</a>
+      <a class="btn btn-ghost" href="#writing">Read the log</a>
+    </div>
+  </div>
+</section>
+
+<!-- ===== ABOUT ===== -->
+<section id="about" class="reveal">
+  <div class="wrap about-grid">
+    <div class="about-body">
+      <div class="section-label">01 / ABOUT</div>
+      <h2>Nicola</h2>
+      <p style="margin-top:20px">I'm an aerospace engineering student. Right now I'm responsible for the software on a project developed in collaboration with ESA &mdash; the kind of work where the code has to be right before anything leaves the ground.</p>
+      <p>When I'm not studying, I follow what actually pulls me in: space exploration, large language models &mdash; both the ones I run locally and the frontier models &mdash; and autonomous agents. Away from the desk, I'm usually following sport, from the court to the track. Most of it turns into code: a lot of Rust, some NixOS, and agents that, more often than not, start as "this shouldn't be that hard."</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== PROJECTS ===== -->
+<section id="projects" class="reveal">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <div class="section-label">02 / PROJECTS</div>
+        <h2>Selected work</h2>
+      </div>
+      <div class="section-note">6 ENTRIES</div>
+    </div>
+  </div>
+  <div class="wrap" style="padding:0">
+    <div class="project-grid">
+
+      <div class="card">
+        <span class="tag tag-aero">AEROSPACE</span>
+        <h3>Satellite on-board software</h3>
+        <p>On-board software for a PocketQube satellite built through an ESA education programme &mdash; architecture, attitude-control integration, and ECSS-aligned documentation.</p>
+        <div class="stack">Embedded C &middot; real-time OS</div>
+      </div>
+
+      <div class="card">
+        <span class="tag tag-aero">AEROSPACE</span>
+        <h3>Multi-flyby trajectory optimizer</h3>
+        <p>Interplanetary trajectory search using patched-conic gravity assists and metaheuristic optimization over a Lambert-solver core.</p>
+        <div class="stack">Rust &middot; nyx-space &middot; argmin</div>
+      </div>
+
+      <div class="card">
+        <span class="tag tag-aero">AEROSPACE</span>
+        <h3>Interceptor guidance simulator</h3>
+        <p>3D guidance simulation implementing PN, APN, and ZEM laws with an alpha-beta-gamma filter and live visualization.</p>
+        <div class="stack">Rust &middot; Bevy &middot; nalgebra</div>
+      </div>
+
+      <div class="card">
+        <span class="tag tag-ai">AI / ML</span>
+        <h3>CUDA inference engine</h3>
+        <p>A general-purpose inference engine from scratch, targeting LFM2.5-230M, with a graph compiler using algebraic rewrites and a learned cost model for kernel scheduling.</p>
+        <div class="stack">Rust &middot; cudarc &middot; egglog</div>
+      </div>
+
+      <div class="card">
+        <span class="tag tag-ai">AI / ML</span>
+        <h3>anduril</h3>
+        <p>A terminal-native AI agent harness with a flat, monochrome TUI, built as the simpler successor to an earlier Rust prototype.</p>
+        <div class="stack">Python &middot; textual</div>
+      </div>
+
+      <div class="card">
+        <span class="tag tag-sys">SYSTEMS</span>
+        <h3>exchacing</h3>
+        <p>An algorithmic trading bot using dual SMA crossover trend-following with ATR-based volatility-scaled position sizing, validated walk-forward.</p>
+        <div class="stack">Rust</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ===== WRITING ===== -->
+<section id="writing" class="reveal">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <div class="section-label">03 / WRITING</div>
+        <h2>Transmission log</h2>
+      </div>
+      <div class="section-note">3 ENTRIES</div>
+    </div>
+    <div class="log-list">
+      <div class="log-row">
+        <div class="log-date">2026-07-18</div>
+        <div class="log-title"><a href="../writing/2026-07-18-silence-of-the-moon.html">"The silence of the Moon, and why we go back"</a></div>
+        <div class="log-cat log-cat-aero">AEROSPACE</div>
+      </div>
+      <div class="log-row">
+        <div class="log-date">2026-07-18</div>
+        <div class="log-title"><a href="../writing/2026-07-18-why-906mb-pi.html">"Why a 906 MB Raspberry Pi is enough for me"</a></div>
+        <div class="log-cat log-cat-sys">SYSTEMS</div>
+      </div>
+      <div class="log-row">
+        <div class="log-date">2026-07-18</div>
+        <div class="log-title"><a href="../writing/2026-07-18-agents-and-search.html">"Agents are changing how we search"</a></div>
+        <div class="log-cat log-cat-ai">AI / ML</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer id="contact" class="reveal">
+  <div class="wrap">
+    <div class="section-label">04 / CONTACT</div>
+    <div class="contact-row">
+      <h2 style="max-width:420px">Open to collaboration, questions, and interesting problems.</h2>
+      <div class="contact-links">
+        <a href="mailto:hello@limitless-labs.dev">Email</a>
+        <a href="https://github.com/Trisert" target="_blank" rel="noopener">GitHub</a>
+        <a href="#" target="_blank" rel="noopener">LinkedIn</a>
+        <a href="../privacy.html">Privacy</a>
+      </div>
+    </div>
+    <div class="foot-meta">&copy; 2026 LIMITLESS LABS &middot; BUILT ON EARTH, AIMED AT ORBIT</div>
+  </div>
+</footer>
+
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.js" } }
+</script>
+<script type="module" src="hero3d.js"></script>
+<script src="scroll.js"></script>
+</body>
+</html>
