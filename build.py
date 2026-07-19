@@ -5,9 +5,7 @@ Reads Markdown from content/<category>/*.md, renders to HTML,
 and writes a static site to the repo root (served by GitHub Pages).
 No Node/Ruby. Runs on the Pi via `uv run`.
 """
-import os
 import re
-import datetime
 from pathlib import Path
 
 try:
@@ -21,10 +19,13 @@ CATEGORIES = ["ai", "tech", "space"]
 
 CATEGORY_TITLES = {"ai": "AI", "tech": "Tecnologia", "space": "Spazio"}
 CATEGORY_BLURBS = {
-    "ai": "Intelligenze artificiali, agenti, modelli — cosa ci riguarda davvero.",
-    "tech": "Calcolatori, self-hosting, strumenti: la tecnologia che usiamo.",
-    "space": "Esplorazione, astronomia, il cosmo e le macchine che lo raggiungono.",
+    "ai": "Modelli locali, inference, e tutto ciò che riguarda l'intelligenza artificiale.",
+    "tech": "Rust, NixOS, agenti e strumenti self-hosted: la tecnologia che costruisco e uso.",
+    "space": "Astrodinamica, satelliti e missioni — dalla dinamica orbitale al volo spaziale.",
 }
+
+NAV = '<nav class="links"><a href="/limitless-labs/ai/">AI</a><a href="/limitless-labs/tech/">Tecnologia</a><a href="/limitless-labs/space/">Spazio</a><a href="/limitless-labs/projects.html">Progetti</a><a href="/limitless-labs/about.html">Chi sono</a></nav>'
+FOOTER = '<footer class="site"><div class="wrap">Limitless Labs — Nicola · 2026</div></footer>'
 
 FM = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 
@@ -39,53 +40,42 @@ def parse(md: str):
         body = md[m.end():]
     return meta, body
 
+HEAD = """<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>{title} — Limitless Labs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;590;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/limitless-labs/style.css"/>
+</head>
+<body>
+<header class="site"><div class="wrap nav">
+  <a class="brand" href="/limitless-labs/">LIMITLESS LABS</a>
+  {nav}
+</div></header>"""
+
 def article_html(title, body_html, meta, category):
     date = meta.get("date", "")
-    return f"""<!DOCTYPE html>
-<html lang="it">
-<head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>{title} — Limitless Labs</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;590;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/limitless-labs/style.css"/>
-</head>
-<body>
-<header class="site"><div class="wrap nav">
-  <a class="brand" href="/limitless-labs/">LIMITLESS LABS</a>
-  <nav class="links"><a href="/limitless-labs/ai/">AI</a><a href="/limitless-labs/tech/">Tecnologia</a><a href="/limitless-labs/space/">Spazio</a><a href="/limitless-labs/about.html">Chi siamo</a></nav>
-</div></header>
+    return (HEAD + """
 <main class="post wrap">
 <article>
-  <div class="kicker">{CATEGORY_TITLES[category]}</div>
+  <div class="kicker">{cat}</div>
   <h1>{title}</h1>
   <div class="meta">{date}</div>
-  <div class="prose">{body_html}</div>
+  <div class="prose">{body}</div>
 </article>
 </main>
-<footer class="site"><div class="wrap">Limitless Labs — Nicola · 2026</div></footer>
-</body></html>"""
+{footer}
+</body></html>""").format(title=title, nav=NAV, footer=FOOTER, cat=CATEGORY_TITLES[category],
+                         body=body_html, date=date)
 
 def page_html(title, body_html):
-    return f"""<!DOCTYPE html>
-<html lang="it">
-<head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>{title} — Limitless Labs</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;590;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/limitless-labs/style.css"/>
-</head>
-<body>
-<header class="site"><div class="wrap nav">
-  <a class="brand" href="/limitless-labs/">LIMITLESS LABS</a>
-  <nav class="links"><a href="/limitless-labs/ai/">AI</a><a href="/limitless-labs/tech/">Tecnologia</a><a href="/limitless-labs/space/">Spazio</a><a href="/limitless-labs/about.html">Chi siamo</a></nav>
-</div></header>
-<main class="post wrap"><article><div class="prose">{body_html}</div></article></main>
-<footer class="site"><div class="wrap">Limitless Labs — Nicola · 2026</div></footer>
-</body></html>"""
+    return (HEAD + """
+<main class="post wrap"><article><div class="prose">{body}</div></article></main>
+{footer}
+</body></html>""").format(title=title, nav=NAV, footer=FOOTER, body=body_html)
 
 def index_html(articles):
     cards = ""
@@ -100,32 +90,18 @@ def index_html(articles):
 <p class="blurb">{CATEGORY_BLURBS[cat]}</p>
 <ul class="list">{items}</ul>
 </section>"""
-    return f"""<!DOCTYPE html>
-<html lang="it">
-<head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Limitless Labs</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;590;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/limitless-labs/style.css"/>
-</head>
-<body>
-<header class="site"><div class="wrap nav">
-  <a class="brand" href="/limitless-labs/">LIMITLESS LABS</a>
-  <nav class="links"><a href="/limitless-labs/ai/">AI</a><a href="/limitless-labs/tech/">Tecnologia</a><a href="/limitless-labs/space/">Spazio</a><a href="/limitless-labs/about.html">Chi siamo</a></nav>
-</div></header>
+    return (HEAD + """
 <section class="hero">
   <div class="wrap">
     <div class="pill">Portfolio personale</div>
     <h1>Pensieri su AI,<br>tecnologia e spazio.</h1>
     <p>Uno spazio personale di Nicola. Note su AI, tecnologia e spazio — quello che lo incuriosisce davvero.</p>
-    <a class="ghost" href="/limitless-labs/about.html">Chi siamo →</a>
+    <a class="ghost" href="/limitless-labs/about.html">Chi sono →</a>
   </div>
 </section>
 <section class="wrap grid">{cards}</section>
-<footer class="site"><div class="wrap">Limitless Labs — Nicola · 2026</div></footer>
-</body></html>"""
+{footer}
+</body></html>""").format(title="Limitless Labs", nav=NAV, footer=FOOTER, cards=cards)
 
 def cat_page_html(cat, articles):
     items = "".join(
@@ -133,28 +109,15 @@ def cat_page_html(cat, articles):
         f'<span class="date">{a["date"]}</span></li>'
         for a in articles if a["cat"] == cat
     ) or '<li class="empty">nessun articolo ancora</li>'
-    return f"""<!DOCTYPE html>
-<html lang="it">
-<head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>{CATEGORY_TITLES[cat]} — Limitless Labs</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;590;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/limitless-labs/style.css"/>
-</head>
-<body>
-<header class="site"><div class="wrap nav">
-  <a class="brand" href="/limitless-labs/">LIMITLESS LABS</a>
-  <nav class="links"><a href="/limitless-labs/ai/">AI</a><a href="/limitless-labs/tech/">Tecnologia</a><a href="/limitless-labs/space/">Spazio</a><a href="/limitless-labs/about.html">Chi siamo</a></nav>
-</div></header>
+    return (HEAD + """
 <section class="wrap grid"><section class="block">
-  <h1 class="cat-title">{CATEGORY_TITLES[cat]}</h1>
-  <p class="blurb">{CATEGORY_BLURBS[cat]}</p>
+  <h1 class="cat-title">{title}</h1>
+  <p class="blurb">{blurb}</p>
   <ul class="list">{items}</ul>
 </section></section>
-<footer class="site"><div class="wrap">Limitless Labs — Nicola · 2026</div></footer>
-</body></html>"""
+{footer}
+</body></html>""").format(title=CATEGORY_TITLES[cat], nav=NAV, footer=FOOTER,
+                         blurb=CATEGORY_BLURBS[cat], items=items)
 
 def main():
     articles = []
@@ -180,9 +143,14 @@ def main():
     about_md = (CONTENT / "about.md").read_text(encoding="utf-8")
     _, about_body = parse(about_md)
     about_html = markdown.markdown(about_body, extensions=["fenced_code"])
-    (ROOT / "about.html").write_text(page_html("Chi siamo", about_html), encoding="utf-8")
+    (ROOT / "about.html").write_text(page_html("Chi sono", about_html), encoding="utf-8")
 
-    print(f"Built {len(articles)} articles + index + categories + about.")
+    projects_md = (CONTENT / "projects.md").read_text(encoding="utf-8")
+    _, projects_body = parse(projects_md)
+    projects_html = markdown.markdown(projects_body, extensions=["fenced_code"])
+    (ROOT / "projects.html").write_text(page_html("Progetti", projects_html), encoding="utf-8")
+
+    print(f"Built {len(articles)} articles + index + categories + about + projects.")
 
 if __name__ == "__main__":
     main()
