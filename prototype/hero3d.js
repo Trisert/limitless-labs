@@ -5,6 +5,7 @@ import * as THREE from 'three';
 const canvas = document.getElementById('orbitCanvas');
 const reduceMotion = window.matchMedia &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const isSmall = window.matchMedia('(max-width: 760px)').matches;
 
 const scene = new THREE.Scene();
 
@@ -12,7 +13,7 @@ const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
 camera.position.set(0, 1.2, 6.2);
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isSmall ? 1.5 : 2));
 
 // ---------- Lights ----------
 scene.add(new THREE.AmbientLight(0x556070, 0.9));
@@ -39,7 +40,7 @@ function makeStars(count, radius) {
   const mat = new THREE.PointsMaterial({ color: 0x9ba1ab, size: 0.045, sizeAttenuation: true, transparent: true, opacity: 0.8 });
   return new THREE.Points(geo, mat);
 }
-const stars = makeStars(1400, 40);
+const stars = makeStars(isSmall ? 700 : 1400, 40);
 scene.add(stars);
 
 // ---------- Earth (stylized, our palette) ----------

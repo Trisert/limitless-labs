@@ -73,3 +73,39 @@
     opacity: 1; transform: none; animation: none;
   }
 }
+
+/* ===== Mobile / touch ===== */
+@media (max-width: 760px){
+  /* Hero: shorter so the 3D + text fit a phone screen without excessive scroll */
+  .hero-3d{ padding: 64px 0 88px; min-height: 78vh; }
+  .hero-3d h1{
+    font-size: clamp(30px, 9vw, 44px);
+    line-height: 1.08;
+    max-width: 100%;
+  }
+  .hero-3d .hero-sub{ font-size: 15px; margin-top: 18px; }
+  .hero-3d .hero-cta{ margin-top: 26px; gap: 10px; }
+  .hero-3d .btn{ padding: 11px 18px; font-size: 13.5px; }
+
+  /* No drag hint on touch (no cursor) */
+  .hero-hint{ display: none; }
+
+  /* Touch devices: drop the 3D tilt (tap would trigger it weirdly) */
+  .card{ transform: none; }
+  .card:hover{ transform: none; box-shadow: none; background: var(--panel-2); }
+
+  /* Reduce star/camera cost on small screens is handled in JS via DPR cap;
+     here just ensure the canvas never overflows */
+  .hero-3d .hero-canvas{ touch-action: pan-y; }
+
+  /* Tighter section padding on mobile */
+  section{ padding: 56px 0; }
+  section.reveal{ padding: 56px 0; }
+}
+
+/* Coarse pointer (touch) globally: never show hover-only transforms */
+@media (hover: none){
+  .card{ transform: none; }
+  .card:hover{ transform: none; box-shadow: none; }
+  .hero-hint{ display: none; }
+}
