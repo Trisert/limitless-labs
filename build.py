@@ -16,12 +16,16 @@ import os
 import re
 import subprocess
 import tempfile
+import json
+import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).parent
 POSTS = ROOT / "posts"
 WRITING = ROOT / "writing"
 INDEX = ROOT / "index.html"
+SITE_URL = "https://trisert.github.io/limitless-labs"
+AUTHOR = "Nicola"
 
 CAT_CLASS = {"aerospace": "log-cat-aero", "ai": "log-cat-ai", "systems": "log-cat-sys"}
 CAT_LABEL = {"aerospace": "AEROSPACE", "ai": "AI / ML", "systems": "SYSTEMS"}
@@ -55,8 +59,10 @@ def read_post(path: Path):
         meta, body = extract_frontmatter(path.read_text(encoding="utf-8"))
         html = markdown_markdown(body)
         title = meta.get("title") or (H1.search(body).group(1) if H1.search(body) else slug)
+        title = title.strip().strip('"').strip("'")
         date = meta.get("date", "")
         cat = (meta.get("category") or "ai").lower()
+        desc = meta.get("description") or first_paragraph_text(body)
     else:
         html = pandoc_to_html(path)
         # strip wrapping <p> if single heading present
@@ -66,7 +72,21 @@ def read_post(path: Path):
             title = re.sub(r"<[^>]+>", "", m.group(1)).strip()
         date = ""
         cat = "ai"
-    return {"slug": slug, "title": title, "date": date, "category": cat, "html": html}
+        desc = first_paragraph_text(html)
+    return {"slug": slug, "title": title, "date": date, "category": cat,
+            "html": html, "description": desc}
+
+def first_paragraph_text(md: str) -> str:
+    """Best-effort plain-text excerpt for meta description / SEO."""
+    # drop frontmatter if present
+    text = re.sub(r"^---\s*\n.*?\n---\s*\n", "", md, flags=re.DOTALL)
+    # strip markdown headings/markers, grab first non-empty paragraph
+    for para in re.split(r"\n\s*\n", text):
+        clean = re.sub(r"[#>*_`\-]+", "", para).strip()
+        clean = re.sub(r"<[^>]+>", "", clean)
+        if len(clean) > 20:
+            return (clean[:155].rstrip() + "…") if len(clean) > 155 else clean
+    return ""
 
 def markdown_markdown(body: str) -> str:
     try:
@@ -81,12 +101,48 @@ def article_page(post):
     cls = CAT_CLASS.get(post["category"], "log-cat-sys")
     label = CAT_LABEL.get(post["category"], post["category"].upper())
     cat_line = f'<div class="log-date">{label} &middot; {post["date"]}</div>' if post["date"] else f'<div class="log-date">{label}</div>'
+
+    url = f"{SITE_URL}/writing/{post['slug']}.html"
+    desc = post.get("description") or post["title"]
+    date_pub = post.get("date") or ""
+    # JSON-LD BlogPosting
+    ld = {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "headline": post["title"],
+        "description": desc,
+        "author": {"@type": "Person", "name": AUTHOR, "url": SITE_URL},
+        "publisher": {"@type": "Organization", "name": "Limitless Labs",
+                       "url": SITE_URL},
+        "mainEntityOfPage": {"@type": "WebPage", "@id": url},
+        "url": url,
+        "inLanguage": "en",
+    }
+    if date_pub:
+        ld["datePublished"] = date_pub
+        ld["dateModified"] = date_pub
+    json_ld = f'<script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>'
+
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>{post['title']} — Limitless Labs</title>
+<meta name="description" content="{desc}">
+<meta name="author" content="{AUTHOR}">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="{url}">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Limitless Labs">
+<meta property="og:title" content="{post['title']}">
+<meta property="og:description" content="{desc}">
+<meta property="og:url" content="{url}">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{post['title']}">
+<meta name="twitter:description" content="{desc}">
+{json_ld}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../style.css"/>
@@ -150,7 +206,36 @@ def main():
       <p>No transmissions yet. The first write-up &mdash; likely on GPU inference tuning or satellite flight software &mdash; lands here.</p>
     </div>""", 0)
     INDEX.write_text(new_html, encoding="utf-8")
+
+    write_sitemap(posts)
+    write_robots()
     print(f"Built {len(posts)} article(s) into writing/ and updated the transmission log.")
+
+
+def write_sitemap(posts):
+    today = datetime.date.today().isoformat()
+    urls = [f'  <url>\n    <loc>{SITE_URL}/</loc>\n    <changefreq>weekly</changefreq>\n    <priority>1.0</priority>\n  </url>']
+    for p in posts:
+        loc = f"{SITE_URL}/writing/{p['slug']}.html"
+        lastmod = p.get("date") or today
+        urls.append(
+            f'  <url>\n    <loc>{loc}</loc>\n    <lastmod>{lastmod}</lastmod>\n'
+            f'    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n  </url>'
+        )
+    xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + "\n".join(urls) + "\n</urlset>\n"
+    (ROOT / "sitemap.xml").write_text(xml, encoding="utf-8")
+    print(f"Wrote sitemap.xml ({len(urls)} URLs).")
+
+
+def write_robots():
+    txt = (
+        "User-agent: *\n"
+        "Allow: /\n"
+        f"Sitemap: {SITE_URL}/sitemap.xml\n"
+    )
+    (ROOT / "robots.txt").write_text(txt, encoding="utf-8")
+    print("Wrote robots.txt.")
+
 
 if __name__ == "__main__":
     main()
