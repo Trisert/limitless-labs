@@ -1,38 +1,641 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Limitless Labs — Limitless Labs</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Limitless Labs</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;590;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/limitless-labs/style.css"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #14171C;
+    --panel: #1A1E25;
+    --panel-2: #20242C;
+    --hairline: #2B303A;
+    --amber: #FFB000;
+    --amber-dim: #8A6100;
+    --steel: #6F93AC;
+    --text: #F1F0EC;
+    --text-dim: #9BA1AB;
+    --text-faint: #5C626D;
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-body: 'IBM Plex Sans', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  *{ box-sizing: border-box; margin:0; padding:0; }
+  html{ scroll-behavior: smooth; }
+  body{
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection{ background: var(--amber); color: #1A1400; }
+  a{ color: inherit; text-decoration: none; }
+
+  .wrap{ max-width: 1080px; margin: 0 auto; padding: 0 28px; }
+
+  /* ---------- Telemetry ticker ---------- */
+  .ticker{
+    background: #0E1013;
+    border-bottom: 1px solid var(--hairline);
+    overflow: hidden;
+    white-space: nowrap;
+    padding: 7px 0;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+  .ticker-track{
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.4px;
+    color: var(--amber);
+    animation: scroll-left 38s linear infinite;
+    padding-left: 100%;
+  }
+  .ticker-track span{ color: var(--text-faint); margin: 0 10px; }
+  @keyframes scroll-left{
+    from{ transform: translateX(0); }
+    to{ transform: translateX(-100%); }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .ticker-track{ animation: none; padding-left: 24px; }
+  }
+
+  /* ---------- Nav ---------- */
+  nav{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 22px 0;
+  }
+  .logo{
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: 0.5px;
+  }
+  .logo .dim{ color: var(--text-dim); font-weight: 400; }
+  .navlinks{
+    display: flex;
+    gap: 28px;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+  .navlinks a:hover{ color: var(--amber); }
+  .navlinks a:focus-visible, a:focus-visible{
+    outline: 2px solid var(--amber);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  /* ---------- Hero ---------- */
+  .hero{
+    position: relative;
+    overflow: hidden;
+    padding: 88px 0 96px;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .hero-canvas{
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    background: var(--bg);
+  }
+  .hero-overlay{
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg,
+      rgba(20,23,28,0.55) 0%,
+      rgba(20,23,28,0.25) 40%,
+      rgba(20,23,28,0.45) 68%,
+      rgba(20,23,28,0.88) 100%);
+    pointer-events: none;
+  }
+  .hero .wrap{ position: relative; z-index: 2; }
+  .hero-eyebrow{
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--steel);
+    letter-spacing: 1px;
+    margin-bottom: 20px;
+  }
+  .hero-eyebrow::before{ content: "▸ "; color: var(--amber); }
+  h1{
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: clamp(40px, 6vw, 68px);
+    line-height: 1.05;
+    letter-spacing: -0.5px;
+    max-width: 780px;
+  }
+  h1 .accent{ color: var(--amber); }
+  .hero-sub{
+    margin-top: 24px;
+    max-width: 560px;
+    font-size: 17px;
+    color: var(--text-dim);
+  }
+  .hero-cta{
+    margin-top: 36px;
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .btn{
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 500;
+    padding: 12px 22px;
+    border-radius: 4px;
+    border: 1px solid var(--hairline);
+    transition: border-color 0.15s ease, background 0.15s ease;
+    display: inline-block;
+  }
+  .btn-primary{
+    background: var(--amber);
+    color: #1A1400;
+    border-color: var(--amber);
+  }
+  .btn-primary:hover{ background: #E5A000; }
+  .btn-ghost{ color: var(--text); }
+  .btn-ghost:hover{ border-color: var(--steel); color: var(--steel); }
+
+  /* ---------- Section shared ---------- */
+  section{ padding: 80px 0; border-bottom: 1px solid var(--hairline); }
+  .section-head{
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 40px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .section-label{
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--amber);
+    letter-spacing: 1px;
+  }
+  h2{
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 28px;
+    margin-top: 6px;
+  }
+  .section-note{ font-size: 13px; color: var(--text-faint); font-family: var(--font-mono); }
+
+  /* ---------- About ---------- */
+  .about-grid{
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 48px;
+  }
+  .about-body p{ color: var(--text-dim); margin-bottom: 16px; font-size: 15.5px; max-width: 560px; }
+  .about-body strong{ color: var(--text); font-weight: 500; }
+  .stat-list{ display: flex; flex-direction: column; gap: 18px; }
+  .stat{
+    border-left: 2px solid var(--amber-dim);
+    padding-left: 16px;
+  }
+  .stat-num{ font-family: var(--font-mono); font-size: 22px; color: var(--amber); }
+  .stat-label{ font-size: 12.5px; color: var(--text-faint); margin-top: 2px; }
+
+  /* ---------- Projects ---------- */
+  .project-grid{
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--hairline);
+    border: 1px solid var(--hairline);
+  }
+  .card{
+    background: var(--panel);
+    padding: 26px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    transition: background 0.15s ease;
+  }
+  .card:hover{ background: var(--panel-2); }
+  .tag{
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.6px;
+    width: fit-content;
+    padding: 3px 8px;
+    border-radius: 3px;
+  }
+  .tag-aero{ color: var(--amber); border: 1px solid var(--amber-dim); }
+  .tag-ai{ color: var(--steel); border: 1px solid #2E4A5B; }
+  .tag-sys{ color: var(--text-dim); border: 1px solid var(--hairline); }
+  .card h3{ font-family: var(--font-display); font-weight: 500; font-size: 17px; }
+  .card p{ font-size: 13.5px; color: var(--text-dim); flex-grow: 1; }
+  .card .stack{ font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); }
+
+  /* ---------- Writing / transmission log ---------- */
+  .log-empty{
+    border: 1px dashed var(--hairline);
+    border-radius: 6px;
+    padding: 44px 32px;
+    text-align: center;
+    color: var(--text-dim);
+  }
+  .log-empty p{ font-size: 14px; max-width: 420px; margin: 8px auto 0; color: var(--text-faint); }
+  .log-empty .glyph{ font-family: var(--font-mono); color: var(--amber); font-size: 20px; }
+
+  .log-list{ display: flex; flex-direction: column; gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); }
+  .log-row{
+    background: var(--panel);
+    padding: 22px 24px;
+    display: grid;
+    grid-template-columns: 140px 1fr auto;
+    gap: 20px;
+    align-items: baseline;
+    transition: background 0.15s ease;
+  }
+  .log-row:hover{ background: var(--panel-2); }
+  .log-date{ font-family: var(--font-mono); font-size: 12px; color: var(--steel); }
+  .log-title{ font-family: var(--font-display); font-weight: 500; font-size: 17px; color: var(--text); }
+  .log-title a{ color: inherit; }
+  .log-title a:hover{ color: var(--amber); }
+  .log-cat{ font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.6px; padding: 3px 8px; border-radius: 3px; }
+  .log-cat-aero{ color: var(--amber); border: 1px solid var(--amber-dim); }
+  .log-cat-ai{ color: var(--steel); border: 1px solid #2E4A5B; }
+  .log-cat-sys{ color: var(--text-dim); border: 1px solid var(--hairline); }
+
+  /* ---------- Article page ---------- */
+  .post{ padding: 72px 0 96px; }
+  .post .wrap{ max-width: 720px; }
+  .post .log-date{ font-size: 13px; margin-bottom: 12px; }
+  .post h1{ max-width: 100%; margin-bottom: 14px; }
+  .post .prose{ margin-top: 36px; }
+  .prose p{ color: var(--text-dim); font-size: 16.5px; line-height: 1.75; margin-bottom: 22px; }
+  .prose h2{ font-family: var(--font-display); font-weight: 500; font-size: 23px; margin: 38px 0 12px; color: var(--text); }
+  .prose h3{ font-family: var(--font-display); font-weight: 500; font-size: 18px; margin: 28px 0 10px; color: var(--text); }
+  .prose a{ color: var(--steel); text-decoration: none; border-bottom: 1px solid var(--hairline); }
+  .prose a:hover{ color: var(--amber); border-color: var(--amber); }
+  .prose code{ font-family: var(--font-mono); background: var(--panel-2); padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.9em; }
+  .prose pre{ background: var(--panel); border: 1px solid var(--hairline); padding: 18px; border-radius: 6px; overflow-x: auto; margin: 22px 0; }
+  .prose pre code{ background: none; padding: 0; }
+  .prose blockquote{ border-left: 2px solid var(--amber); padding-left: 18px; color: var(--text-faint); margin: 22px 0; font-style: italic; }
+  .prose ul, .prose ol{ color: var(--text-dim); margin: 0 0 22px 22px; }
+  .prose li{ margin-bottom: 8px; }
+
+  /* ---------- Contact / footer ---------- */
+  footer{ padding: 64px 0 40px; }
+  .contact-row{
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 24px;
+  }
+  .contact-links{ display: flex; gap: 20px; font-size: 13.5px; }
+  .contact-links a{ color: var(--text-dim); border-bottom: 1px solid transparent; }
+  .contact-links a:hover{ color: var(--amber); border-color: var(--amber); }
+  .foot-meta{ font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); margin-top: 40px; }
+
+  @media (max-width: 760px){
+    .about-grid{ grid-template-columns: 1fr; }
+    .project-grid{ grid-template-columns: 1fr; }
+    .navlinks{ display: none; }
+    .log-row{ grid-template-columns: 1fr; gap: 8px; }
+  }
+</style>
 </head>
 <body>
-<header class="site"><div class="wrap nav">
-  <a class="brand" href="/limitless-labs/">LIMITLESS LABS</a>
-  <nav class="links"><a href="/limitless-labs/ai/">AI</a><a href="/limitless-labs/tech/">Tecnologia</a><a href="/limitless-labs/space/">Spazio</a><a href="/limitless-labs/projects.html">Progetti</a><a href="/limitless-labs/about.html">Chi sono</a></nav>
-</div></header>
-<section class="hero">
+
+<div class="ticker" role="status" aria-label="status ticker">
+  <div class="ticker-track">
+    EPOCH 2026-07-10T14:02:11Z <span>|</span> INC 97.4&deg; <span>|</span> ALT 550.2 KM <span>|</span> RAAN 214.7&deg; <span>|</span> ECC 0.0012 <span>|</span> STATUS: NOMINAL <span>|</span> ORBITAL PERIOD 95.6 MIN <span>|</span> AOCS LOCK: ACQUIRED <span>|</span>
+  </div>
+</div>
+
+<div class="wrap">
+  <nav>
+    <div class="logo">LIMITLESS <span class="dim">LABS</span></div>
+    <div class="navlinks">
+      <a href="#about">About</a>
+      <a href="#projects">Projects</a>
+      <a href="#writing">Writing</a>
+      <a href="#contact">Contact</a>
+    </div>
+  </nav>
+</div>
+
+<div class="hero">
+  <canvas class="hero-canvas" id="meshCanvas" aria-hidden="true"></canvas>
+  <div class="hero-overlay"></div>
   <div class="wrap">
-    <div class="pill">Portfolio personale</div>
-    <h1>Pensieri su AI,<br>tecnologia e spazio.</h1>
-    <p>Uno spazio personale di Nicola. Note su AI, tecnologia e spazio — quello che lo incuriosisce davvero.</p>
-    <a class="ghost" href="/limitless-labs/about.html">Chi sono →</a>
+    <div class="hero-eyebrow">AEROSPACE &middot; SYSTEMS &middot; AI</div>
+    <h1>Software that has to work<br>the <span class="accent">first</span> time.</h1>
+    <p class="hero-sub">I build flight software, inference engines, and the tools in between &mdash; from satellite OBSW running on FreeRTOS to CUDA kernels chasing the last millisecond out of a GPU.</p>
+    <div class="hero-cta">
+      <a class="btn btn-primary" href="#projects">View projects</a>
+      <a class="btn btn-ghost" href="#writing">Read the log</a>
+    </div>
+  </div>
+</div>
+
+<section id="about">
+  <div class="wrap about-grid">
+    <div class="about-body">
+      <div class="section-label">01 / ABOUT</div>
+      <h2>Nicola</h2>
+      <p style="margin-top:20px">I lead software for <strong>RedPill</strong>, a PocketQube satellite flown under ESA's Fly Your Satellite! programme, where the job is OBSW architecture, AOCS, and the astrodynamics that keep a spacecraft pointed the right way.</p>
+      <p>Outside of that, I write low-level Rust, run local LLM inference across a dual-GPU rig, and build agents and tools that usually start as "this shouldn't be that hard."</p>
+    </div>
+    <div class="stat-list">
+      <div class="stat">
+        <div class="stat-num">FreeRTOS / STM32L4</div>
+        <div class="stat-label">flight software target</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">P100 + RTX 2060</div>
+        <div class="stat-label">dual-GPU inference rig</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">NixOS</div>
+        <div class="stat-label">everything, reproducibly</div>
+      </div>
+    </div>
   </div>
 </section>
-<section class="wrap grid"><section class="block">
-<h2><a href="/limitless-labs/ai/">AI</a></h2>
-<p class="blurb">Modelli locali, inference, e tutto ciò che riguarda l'intelligenza artificiale.</p>
-<ul class="list"><li><a href="/limitless-labs/ai/2026-07-18-agenti-e-ricerca.html">"Gli agenti stanno cambiando come cerchiamo le risposte"</a><span class="date">2026-07-18</span></li></ul>
-</section><section class="block">
-<h2><a href="/limitless-labs/tech/">Tecnologia</a></h2>
-<p class="blurb">Rust, NixOS, agenti e strumenti self-hosted: la tecnologia che costruisco e uso.</p>
-<ul class="list"><li><a href="/limitless-labs/tech/2026-07-18-perche-pi-906mb.html">"Perché un Raspberry Pi da 906 MB mi basta"</a><span class="date">2026-07-18</span></li></ul>
-</section><section class="block">
-<h2><a href="/limitless-labs/space/">Spazio</a></h2>
-<p class="blurb">Astrodinamica, satelliti e missioni — dalla dinamica orbitale al volo spaziale.</p>
-<ul class="list"><li><a href="/limitless-labs/space/2026-07-18-silenzio-della-luna.html">"Il silenzio della Luna e perché ci torniamo"</a><span class="date">2026-07-18</span></li></ul>
-</section></section>
-<footer class="site"><div class="wrap">Limitless Labs — Nicola · 2026</div></footer>
-</body></html>
+
+<section id="projects">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <div class="section-label">02 / PROJECTS</div>
+        <h2>Selected work</h2>
+      </div>
+      <div class="section-note">6 ENTRIES</div>
+    </div>
+  </div>
+  <div class="wrap" style="padding:0">
+    <div class="project-grid">
+
+      <div class="card">
+        <span class="tag tag-aero">AEROSPACE</span>
+        <h3>RedPill OBSW</h3>
+        <p>On-board software for a PocketQube satellite under ESA's Fly Your Satellite! programme &mdash; architecture, AOCS integration, and ECSS-aligned documentation.</p>
+        <div class="stack">FreeRTOS &middot; STM32L4 &middot; C</div>
+      </div>
+
+      <div class="card">
+        <span class="tag tag-aero">AEROSPACE</span>
+        <h3>Multi-flyby trajectory optimizer</h3>
+        <p>Interplanetary trajectory search using patched-conic gravity assists and metaheuristic optimization over a Lambert-solver core.</p>
+        <div class="stack">Rust &middot; nyx-space &middot; argmin</div>
+      </div>
+
+      <div class="card">
+        <span class="tag tag-aero">AEROSPACE</span>
+        <h3>Interceptor guidance simulator</h3>
+        <p>3D guidance simulation implementing PN, APN, and ZEM laws with an alpha-beta-gamma filter and live visualization.</p>
+        <div class="stack">Rust &middot; Bevy &middot; nalgebra</div>
+      </div>
+
+      <div class="card">
+        <span class="tag tag-ai">AI / ML</span>
+        <h3>CUDA inference engine</h3>
+        <p>A general-purpose inference engine from scratch, targeting LFM2.5-230M, with a graph compiler using algebraic rewrites and a learned cost model for kernel scheduling.</p>
+        <div class="stack">Rust &middot; cudarc &middot; egglog</div>
+      </div>
+
+      <div class="card">
+        <span class="tag tag-ai">AI / ML</span>
+        <h3>anduril</h3>
+        <p>A terminal-native AI agent harness with a flat, monochrome TUI, built as the simpler successor to an earlier Rust prototype.</p>
+        <div class="stack">Python &middot; textual</div>
+      </div>
+
+      <div class="card">
+        <span class="tag tag-sys">SYSTEMS</span>
+        <h3>exchacing</h3>
+        <p>An algorithmic trading bot using dual SMA crossover trend-following with ATR-based volatility-scaled position sizing, validated walk-forward.</p>
+        <div class="stack">Rust</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<section id="writing">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <div class="section-label">03 / WRITING</div>
+        <h2>Transmission log</h2>
+      </div>
+      <div class="section-note" id="log-count">3 ENTRIES</div>
+    </div>
+    <!-- LOG_START -->
+<div class="log-list">
+    <div class="log-row">
+      <div class="log-date">2026-07-18</div>
+      <div class="log-title"><a href="writing/2026-07-18-silence-of-the-moon.html">"The silence of the Moon, and why we go back"</a></div>
+      <div class="log-cat log-cat-aero">AEROSPACE</div>
+    </div>
+    <div class="log-row">
+      <div class="log-date">2026-07-18</div>
+      <div class="log-title"><a href="writing/2026-07-18-why-906mb-pi.html">"Why a 906 MB Raspberry Pi is enough for me"</a></div>
+      <div class="log-cat log-cat-sys">SYSTEMS</div>
+    </div>
+    <div class="log-row">
+      <div class="log-date">2026-07-18</div>
+      <div class="log-title"><a href="writing/2026-07-18-agents-and-search.html">"Agents are changing how we search"</a></div>
+      <div class="log-cat log-cat-ai">AI / ML</div>
+    </div>
+    </div>
+    <!-- LOG_END -->
+  </div>
+</section>
+
+<footer id="contact">
+  <div class="wrap">
+    <div class="section-label">04 / CONTACT</div>
+    <div class="contact-row">
+      <h2 style="max-width:420px">Open to collaboration, questions, and interesting problems.</h2>
+      <div class="contact-links">
+        <a href="mailto:hello@limitless-labs.dev">Email</a>
+        <a href="https://github.com/Trisert" target="_blank" rel="noopener">GitHub</a>
+        <a href="#" target="_blank" rel="noopener">LinkedIn</a>
+      </div>
+    </div>
+    <div class="foot-meta">&copy; 2026 LIMITLESS LABS &middot; BUILT ON EARTH, AIMED AT ORBIT</div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  var canvas = document.getElementById('meshCanvas');
+  var ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var NUM_PLANES = 6, SATS_PER_PLANE = 5;
+  var TOTAL_SATS = NUM_PLANES * SATS_PER_PLANE;
+  var PHASE_FACTOR = 2;
+  var INCLINATION = 55 * Math.PI / 180;
+  var ORBIT_R = 1.7, EARTH_RADIUS = 1;
+  var TILT = 24 * Math.PI / 180;
+  var SPIN_SPEED = (2 * Math.PI) / 70000;
+  var SAT_ANGULAR_SPEED = (2 * Math.PI) / 26000;
+  var LINK_DIST = 1.05, MAX_PULSES = 6, PULSE_INTERVAL = 650, ORBIT_SAMPLES = 48;
+
+  var ACCENT = 'rgba(255,176,0,', LINK_COLOR = 'rgba(111,147,172,', NODE_COLOR = 'rgba(214,222,229,', ORBIT_COLOR = 'rgba(90,120,145,';
+
+  var W = 0, H = 0, cx = 0, cy = 0, scale = 1;
+  var planes = [], satellites = [], pulses = [];
+  var simTime = 0, lastPulseTime = 0, lastFrameTime = 0;
+
+  function rand(a, b){ return a + Math.random() * (b - a); }
+  function walkerBasePoint(theta, incl, raan, r){
+    var x = r * Math.cos(theta), y = r * Math.sin(theta);
+    var y1 = y * Math.cos(incl), z1 = y * Math.sin(incl);
+    var x2 = x * Math.cos(raan) - y1 * Math.sin(raan);
+    var y2 = x * Math.sin(raan) + y1 * Math.cos(raan);
+    return { x: x2, y: y2, z: z1 };
+  }
+  function applyView(p, spin){
+    var xs = p.x * Math.cos(spin) - p.y * Math.sin(spin);
+    var ys = p.x * Math.sin(spin) + p.y * Math.cos(spin);
+    var zs = p.z;
+    var yt = ys * Math.cos(TILT) - zs * Math.sin(TILT);
+    var zt = ys * Math.sin(TILT) + zs * Math.cos(TILT);
+    return { x: xs, y: yt, z: zt };
+  }
+  function initConstellation(){
+    planes = [];
+    for (var p = 0; p < NUM_PLANES; p++){
+      var raan = p * (2 * Math.PI / NUM_PLANES), basePoints = [];
+      for (var k = 0; k <= ORBIT_SAMPLES; k++){
+        var theta = k * (2 * Math.PI / ORBIT_SAMPLES);
+        basePoints.push(walkerBasePoint(theta, INCLINATION, raan, ORBIT_R));
+      }
+      planes.push({ raan: raan, basePoints: basePoints });
+    }
+    satellites = [];
+    for (var pi = 0; pi < NUM_PLANES; pi++){
+      var raanP = pi * (2 * Math.PI / NUM_PLANES);
+      for (var s = 0; s < SATS_PER_PLANE; s++){
+        var M0 = (2 * Math.PI / SATS_PER_PLANE) * s + (2 * Math.PI * PHASE_FACTOR / TOTAL_SATS) * pi;
+        satellites.push({ raan: raanP, M0: M0, sx: 0, sy: 0, depth: 0, bx: 0, by: 0, bz: 0 });
+      }
+    }
+    pulses = [];
+  }
+  function resize(){
+    var rect = canvas.getBoundingClientRect();
+    var dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    W = rect.width; H = rect.height;
+    canvas.width = Math.max(1, Math.floor(W * dpr));
+    canvas.height = Math.max(1, Math.floor(H * dpr));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cx = W * 0.5; cy = H * 0.5; scale = Math.min(W, H) * 0.34 / ORBIT_R;
+    if (planes.length === 0) initConstellation();
+  }
+  function project(p){ return { sx: cx + p.x * scale, sy: cy - p.y * scale, depth: p.z }; }
+  function updateSatellites(spin){
+    for (var i = 0; i < satellites.length; i++){
+      var sat = satellites[i];
+      var theta = sat.M0 + simTime * SAT_ANGULAR_SPEED;
+      var base = walkerBasePoint(theta, INCLINATION, sat.raan, ORBIT_R);
+      sat.bx = base.x; sat.by = base.y; sat.bz = base.z;
+      var view = applyView(base, spin), scr = project(view);
+      sat.sx = scr.sx; sat.sy = scr.sy; sat.depth = scr.depth;
+    }
+  }
+  function buildLinks(){
+    var links = [];
+    for (var i = 0; i < satellites.length; i++){
+      for (var j = i + 1; j < satellites.length; j++){
+        var a = satellites[i], b = satellites[j];
+        var dx = a.bx - b.bx, dy = a.by - b.by, dz = a.bz - b.bz;
+        var d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (d < LINK_DIST) links.push({ i: i, j: j, d: d });
+      }
+    }
+    return links;
+  }
+  function maybeSpawnPulse(links, time){
+    if (pulses.length >= MAX_PULSES) return;
+    if (time - lastPulseTime < PULSE_INTERVAL) return;
+    if (links.length === 0) return;
+    var l = links[Math.floor(Math.random() * links.length)];
+    pulses.push({ i: l.i, j: l.j, t: 0, dur: rand(900, 1600) });
+    lastPulseTime = time;
+  }
+  function depthAlpha(depth){ var n = (depth + ORBIT_R) / (2 * ORBIT_R); return Math.max(0.15, Math.min(1, n)); }
+  function draw(spin, links){
+    ctx.clearRect(0, 0, W, H);
+    var er = EARTH_RADIUS * scale;
+    var grad = ctx.createRadialGradient(cx - er * 0.3, cy - er * 0.3, er * 0.1, cx, cy, er);
+    grad.addColorStop(0, 'rgba(46,54,64,0.9)'); grad.addColorStop(1, 'rgba(20,23,28,0.95)');
+    ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(cx, cy, er, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,176,0,0.18)'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.lineWidth = 0.6;
+    for (var p = 0; p < planes.length; p++){
+      var pts = planes[p].basePoints, avgDepth = 0;
+      ctx.beginPath();
+      for (var k = 0; k < pts.length; k++){
+        var view = applyView(pts[k], spin), scr = project(view);
+        avgDepth += scr.depth;
+        if (k === 0) ctx.moveTo(scr.sx, scr.sy); else ctx.lineTo(scr.sx, scr.sy);
+      }
+      avgDepth /= pts.length;
+      ctx.strokeStyle = ORBIT_COLOR + (0.12 + depthAlpha(avgDepth) * 0.14).toFixed(3) + ')';
+      ctx.stroke();
+    }
+    for (var li = 0; li < links.length; li++){
+      var l = links[li], a = satellites[l.i], b = satellites[l.j];
+      var alpha = (1 - l.d / LINK_DIST) * 0.4 * ((depthAlpha(a.depth) + depthAlpha(b.depth)) / 2);
+      ctx.strokeStyle = LINK_COLOR + alpha.toFixed(3) + ')';
+      ctx.beginPath(); ctx.moveTo(a.sx, a.sy); ctx.lineTo(b.sx, b.sy); ctx.stroke();
+    }
+    for (var i = 0; i < satellites.length; i++){
+      var s = satellites[i], da = depthAlpha(s.depth), r = 1.0 + da * 1.6;
+      ctx.fillStyle = NODE_COLOR + (0.3 + da * 0.6).toFixed(3) + ')';
+      ctx.beginPath(); ctx.arc(s.sx, s.sy, r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'lighter';
+    for (var pu = pulses.length - 1; pu >= 0; pu--){
+      var pulse = pulses[pu], t = pulse.t / pulse.dur;
+      if (t >= 1){ pulses.splice(pu, 1); continue; }
+      var a2 = satellites[pulse.i], b2 = satellites[pulse.j];
+      var x = a2.sx + (b2.sx - a2.sx) * t, y = a2.sy + (b2.sy - a2.sy) * t;
+      var fade = Math.sin(Math.min(t, 1) * Math.PI);
+      var g = ctx.createRadialGradient(x, y, 0, x, y, 6.5);
+      g.addColorStop(0, ACCENT + (0.9 * fade).toFixed(3) + ')'); g.addColorStop(1, ACCENT + '0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 6.5, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  function frame(time){
+    var dt = time - lastFrameTime; lastFrameTime = time; simTime += dt;
+    var spin = simTime * SPIN_SPEED;
+    updateSatellites(spin);
+    var links = buildLinks();
+    for (var p = 0; p < pulses.length; p++) pulses[p].t += dt;
+    maybeSpawnPulse(links, time);
+    draw(spin, links);
+    requestAnimationFrame(frame);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+  if (reduceMotion){ updateSatellites(0); draw(0, buildLinks()); }
+  else { requestAnimationFrame(frame); }
+})();
+</script>
+</body>
+</html>
