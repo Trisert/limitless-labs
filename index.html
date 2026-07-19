@@ -521,6 +521,25 @@
     }
     pulses = [];
   }
+  function initRealSatellites(data){
+    // data.sats: [[x,y,z],...] in Earth radii (TEME/ECI)
+    satellites = data.sats.map(function(v){ return { bx: v[0], by: v[1], bz: v[2], sx: 0, sy: 0, depth: 0, raan: 0, M0: 0 }; });
+    planes = [];
+    pulses = [];
+  }
+  function loadSatellites(){
+    try {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', 'data/satellites.json?cb=' + Date.now(), false);
+      xhr.send();
+      if (xhr.status === 200){
+        var data = JSON.parse(xhr.responseText);
+        if (data && data.sats && data.sats.length > 50){ initRealSatellites(data); return true; }
+      }
+    } catch(e){ /* fall back to Walker Delta */ }
+    initConstellation();
+    return false;
+  }
   function resize(){
     var rect = canvas.getBoundingClientRect();
     var dpr = Math.min(window.devicePixelRatio || 1, 1.5);
@@ -529,16 +548,18 @@
     canvas.height = Math.max(1, Math.floor(H * dpr));
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     cx = W * 0.5; cy = H * 0.5; scale = Math.min(W, H) * 0.34 / ORBIT_R;
-    if (planes.length === 0) initConstellation();
+    if (satellites.length === 0) loadSatellites();
   }
   function project(p){ return { sx: cx + p.x * scale, sy: cy - p.y * scale, depth: p.z }; }
   function updateSatellites(spin){
     for (var i = 0; i < satellites.length; i++){
       var sat = satellites[i];
-      var theta = sat.M0 + simTime * SAT_ANGULAR_SPEED;
-      var base = walkerBasePoint(theta, INCLINATION, sat.raan, ORBIT_R);
-      sat.bx = base.x; sat.by = base.y; sat.bz = base.z;
-      var view = applyView(base, spin), scr = project(view);
+      if (sat.M0 !== undefined && sat.raan !== undefined && sat.M0){
+        var theta = sat.M0 + simTime * SAT_ANGULAR_SPEED;
+        var base = walkerBasePoint(theta, INCLINATION, sat.raan, ORBIT_R);
+        sat.bx = base.x; sat.by = base.y; sat.bz = base.z;
+      }
+      var view = applyView({ x: sat.bx, y: sat.by, z: sat.bz }, spin), scr = project(view);
       sat.sx = scr.sx; sat.sy = scr.sy; sat.depth = scr.depth;
     }
   }
@@ -563,25 +584,27 @@
     lastPulseTime = time;
   }
   function depthAlpha(depth){ var n = (depth + ORBIT_R) / (2 * ORBIT_R); return Math.max(0.15, Math.min(1, n)); }
-  function draw(spin, links){
+  function draw(spin, links, realMode){
     ctx.clearRect(0, 0, W, H);
     var er = EARTH_RADIUS * scale;
     var grad = ctx.createRadialGradient(cx - er * 0.3, cy - er * 0.3, er * 0.1, cx, cy, er);
     grad.addColorStop(0, 'rgba(46,54,64,0.9)'); grad.addColorStop(1, 'rgba(20,23,28,0.95)');
     ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(cx, cy, er, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = 'rgba(255,176,0,0.18)'; ctx.lineWidth = 1; ctx.stroke();
-    ctx.lineWidth = 0.6;
-    for (var p = 0; p < planes.length; p++){
-      var pts = planes[p].basePoints, avgDepth = 0;
-      ctx.beginPath();
-      for (var k = 0; k < pts.length; k++){
-        var view = applyView(pts[k], spin), scr = project(view);
-        avgDepth += scr.depth;
-        if (k === 0) ctx.moveTo(scr.sx, scr.sy); else ctx.lineTo(scr.sx, scr.sy);
+    if (!realMode){
+      ctx.lineWidth = 0.6;
+      for (var p = 0; p < planes.length; p++){
+        var pts = planes[p].basePoints, avgDepth = 0;
+        ctx.beginPath();
+        for (var k = 0; k < pts.length; k++){
+          var view = applyView(pts[k], spin), scr = project(view);
+          avgDepth += scr.depth;
+          if (k === 0) ctx.moveTo(scr.sx, scr.sy); else ctx.lineTo(scr.sx, scr.sy);
+        }
+        avgDepth /= pts.length;
+        ctx.strokeStyle = ORBIT_COLOR + (0.12 + depthAlpha(avgDepth) * 0.14).toFixed(3) + ')';
+        ctx.stroke();
       }
-      avgDepth /= pts.length;
-      ctx.strokeStyle = ORBIT_COLOR + (0.12 + depthAlpha(avgDepth) * 0.14).toFixed(3) + ')';
-      ctx.stroke();
     }
     for (var li = 0; li < links.length; li++){
       var l = links[li], a = satellites[l.i], b = satellites[l.j];
@@ -611,15 +634,19 @@
     var dt = time - lastFrameTime; lastFrameTime = time; simTime += dt;
     var spin = simTime * SPIN_SPEED;
     updateSatellites(spin);
-    var links = buildLinks();
-    for (var p = 0; p < pulses.length; p++) pulses[p].t += dt;
-    maybeSpawnPulse(links, time);
-    draw(spin, links);
+    var links = realMode ? [] : buildLinks();
+    if (!realMode){
+      for (var p = 0; p < pulses.length; p++) pulses[p].t += dt;
+      maybeSpawnPulse(links, time);
+    }
+    draw(spin, links, realMode);
     requestAnimationFrame(frame);
   }
+  var realMode = (satellites.length > 50);
   window.addEventListener('resize', resize);
   resize();
-  if (reduceMotion){ updateSatellites(0); draw(0, buildLinks()); }
+  realMode = (satellites.length > 50);
+  if (reduceMotion){ updateSatellites(0); draw(0, realMode ? [] : buildLinks(), realMode); }
   else { requestAnimationFrame(frame); }
 })();
 </script>
