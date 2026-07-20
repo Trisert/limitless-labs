@@ -346,6 +346,8 @@ footer{ padding: 64px 0 40px; }
 .prose code{ font-family: var(--font-mono); font-size: 0.88em; background: #1c2026; border: 1px solid var(--hairline); padding: 1px 6px; border-radius: 4px; color: #e6c08a; }
 .prose pre code{ background: none; border: none; padding: 0; color: inherit; }
 .log-date{ font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); }
+.prose .footnote{ font-size: 13px; line-height: 1.5; color: var(--text-faint); margin-top: 14px; }
+.prose .footnote em{ color: var(--text-faint); }
 
 /* ===== Mobile / touch ===== */
 @media (max-width: 760px){

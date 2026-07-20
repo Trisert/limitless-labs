@@ -84,7 +84,7 @@ The "rapid iteration" isn't a slogan — it's visible in the deployment curve. T
 </svg>
 </div>
 
-*Sources: Jonathan McDowell / planet4589.org (constellation counts, via space.com); analyst estimates for subscriber milestones. Figures are approximate and partly modelled.*
+<p class="footnote"><em>Sources: Jonathan McDowell / planet4589.org (constellation counts, via space.com); analyst estimates for subscriber milestones. Figures are approximate and partly modelled.</em></p>
 
 ## The game is "who owns the current bottleneck"
 
