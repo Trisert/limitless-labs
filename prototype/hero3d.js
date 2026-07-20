@@ -48,49 +48,18 @@ scene.add(stars);
 const earthGroup = new THREE.Group();
 scene.add(earthGroup);
 
-// ---- Planet: real Earth texture (Blue Marble) + day/night terminator ----
+// ---- Planet: real Earth texture (Blue Marble) + day/night via lighting ----
 const texLoader = new THREE.TextureLoader();
 const earthTex = texLoader.load('textures/earth-blue-marble.jpg');
 earthTex.colorSpace = THREE.SRGBColorSpace;
 earthTex.anisotropy = 4;
 
-const planetUniforms = {
-  uDayTex:   { value: earthTex },
-  uLightDir: { value: new THREE.Vector3(1, 0.4, 0.6).normalize() },
-  uNight:    { value: new THREE.Color(0x0a0f16) },   // dark side
-  uTerm:     { value: new THREE.Color(0xffb000) },   // terminator glow (amber)
-  uAmbient:  { value: 0.06 }
-};
-const planetMat = new THREE.ShaderMaterial({
-  uniforms: planetUniforms,
-  vertexShader: `
-    varying vec3 vNormal;
-    varying vec2 vUv;
-    void main(){
-      vNormal = normalize(normalMatrix * normal);
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
-    }`,
-  fragmentShader: `
-    uniform sampler2D uDayTex;
-    uniform vec3 uLightDir;
-    uniform vec3 uNight;
-    uniform vec3 uTerm;
-    uniform float uAmbient;
-    varying vec3 vNormal;
-    varying vec2 vUv;
-    void main(){
-      vec3 N = normalize(vNormal);
-      float d = dot(N, normalize(uLightDir));
-      vec3 dayCol = texture2D(uDayTex, vUv).rgb;
-      float term = smoothstep(-0.20, 0.20, d);
-      vec3 base = mix(uNight, dayCol, term);
-      // amber rim exactly at the terminator
-      float rim = exp(-pow(d / 0.16, 2.0));
-      base += uTerm * rim * 0.45;
-      base += dayCol * uAmbient;
-      gl_FragColor = vec4(base, 1.0);
-    }`
+const planetMat = new THREE.MeshStandardMaterial({
+  map: earthTex,
+  roughness: 1.0,
+  metalness: 0.0,
+  emissive: new THREE.Color(0x0a0f16),   // dark side faint glow
+  emissiveIntensity: 0.35
 });
 const planet = new THREE.Mesh(new THREE.SphereGeometry(1.5, 64, 64), planetMat);
 earthGroup.add(planet);
@@ -119,9 +88,6 @@ const atmMat = new THREE.ShaderMaterial({
 });
 const atm = new THREE.Mesh(new THREE.SphereGeometry(1.66, 48, 48), atmMat);
 earthGroup.add(atm);
-
-// Keep the day/night light direction in sync with the key light
-planetUniforms.uLightDir.value.copy(key.position).normalize();
 
 // ---------- Orbital rings + satellites ----------
 const RING_DEFS = [
