@@ -48,43 +48,47 @@ scene.add(stars);
 const earthGroup = new THREE.Group();
 scene.add(earthGroup);
 
-// ---- Planet with day/night terminator (custom shader) ----
+// ---- Planet: real Earth texture (Blue Marble) + day/night terminator ----
+const texLoader = new THREE.TextureLoader();
+const earthTex = texLoader.load('textures/earth-blue-marble.jpg');
+earthTex.colorSpace = THREE.SRGBColorSpace;
+earthTex.anisotropy = 4;
+
 const planetUniforms = {
+  uDayTex:   { value: earthTex },
   uLightDir: { value: new THREE.Vector3(1, 0.4, 0.6).normalize() },
-  uDay:      { value: new THREE.Color(0x2a3b4d) },   // lit side (steel-blue)
   uNight:    { value: new THREE.Color(0x0a0f16) },   // dark side
   uTerm:     { value: new THREE.Color(0xffb000) },   // terminator glow (amber)
-  uAmbient:  { value: 0.18 }
+  uAmbient:  { value: 0.06 }
 };
 const planetMat = new THREE.ShaderMaterial({
   uniforms: planetUniforms,
   vertexShader: `
     varying vec3 vNormal;
-    varying vec3 vPos;
+    varying vec2 vUv;
     void main(){
       vNormal = normalize(normalMatrix * normal);
-      vPos = position;
+      vUv = uv;
       gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
     }`,
   fragmentShader: `
+    uniform sampler2D uDayTex;
     uniform vec3 uLightDir;
-    uniform vec3 uDay;
     uniform vec3 uNight;
     uniform vec3 uTerm;
     uniform float uAmbient;
     varying vec3 vNormal;
-    varying vec3 vPos;
+    varying vec2 vUv;
     void main(){
       vec3 N = normalize(vNormal);
-      // light comes from view-ish space; use world-ish dir
       float d = dot(N, normalize(uLightDir));
-      // terminator band
-      float term = smoothstep(-0.25, 0.25, d);
-      vec3 base = mix(uNight, uDay, term);
+      vec3 dayCol = texture2D(uDayTex, vUv).rgb;
+      float term = smoothstep(-0.20, 0.20, d);
+      vec3 base = mix(uNight, dayCol, term);
       // amber rim exactly at the terminator
-      float rim = exp(-pow((d)/0.18, 2.0));
-      base += uTerm * rim * 0.5;
-      base += uDay * uAmbient;
+      float rim = exp(-pow(d / 0.16, 2.0));
+      base += uTerm * rim * 0.45;
+      base += dayCol * uAmbient;
       gl_FragColor = vec4(base, 1.0);
     }`
 });
