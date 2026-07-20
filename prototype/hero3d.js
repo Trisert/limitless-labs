@@ -131,7 +131,7 @@ RING_DEFS.forEach(def => {
 let dragging = false, px = 0, py = 0;
 let targetRotX = 0.25, targetRotY = 0;
 let curRotX = 0.25, curRotY = 0;
-let autoSpin = reduceMotion ? 0 : 0.0009;
+let autoSpin = 0.0009;  // gentle constant spin (independent of reduced-motion)
 
 canvas.addEventListener('pointerdown', e => { dragging = true; px = e.clientX; py = e.clientY; });
 window.addEventListener('pointerup', () => dragging = false);
