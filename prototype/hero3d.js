@@ -80,13 +80,6 @@ function makePocketQube(color) {
   const pR = new THREE.Mesh(panelGeo, panelMat); pR.position.x = 0.085;
   g.add(pL); g.add(pR);
 
-  // accent ring in orbit color
-  const accent = new THREE.Mesh(
-    new THREE.TorusGeometry(0.045, 0.006, 6, 16),
-    new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: 0.9, roughness: 0.4 })
-  );
-  g.add(accent);
-
   return g;
 }
 
@@ -180,7 +173,6 @@ function animate(now) {
 
   rings.forEach(r => {
     r.group.rotation.y += r.speed * dt;
-    r.sats.forEach(s => { s.rotation.y += dt * 0.6; });
   });
 
   stars.rotation.y += 0.0004;
