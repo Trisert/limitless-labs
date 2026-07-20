@@ -64,7 +64,32 @@ const planetMat = new THREE.MeshStandardMaterial({
 const planet = new THREE.Mesh(new THREE.SphereGeometry(1.5, 64, 64), planetMat);
 earthGroup.add(planet);
 
-// ---------- Orbital rings + satellites ----------
+// ---------- Orbital rings + satellites (PocketQube: cube + solar panels) ----------
+function makePocketQube(color) {
+  const g = new THREE.Group();
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xb9c0c8, roughness: 0.5, metalness: 0.3 });
+  const panelMat = new THREE.MeshStandardMaterial({ color: 0x1b2c4a, emissive: 0x0a1830, emissiveIntensity: 0.5, roughness: 0.3, metalness: 0.2 });
+
+  // main cube (5cm unit)
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.05), bodyMat);
+  g.add(body);
+
+  // two solar panels (flat boxes) on X sides
+  const panelGeo = new THREE.BoxGeometry(0.11, 0.04, 0.005);
+  const pL = new THREE.Mesh(panelGeo, panelMat); pL.position.x = -0.085;
+  const pR = new THREE.Mesh(panelGeo, panelMat); pR.position.x = 0.085;
+  g.add(pL); g.add(pR);
+
+  // accent ring in orbit color
+  const accent = new THREE.Mesh(
+    new THREE.TorusGeometry(0.045, 0.006, 6, 16),
+    new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: 0.9, roughness: 0.4 })
+  );
+  g.add(accent);
+
+  return g;
+}
+
 const RING_DEFS = [
   { radius: 2.4, count: 7, tilt: 0.35, color: 0xffb000, speed: 0.18 },
   { radius: 3.1, count: 9, tilt: -0.5, color: 0x6f93ac, speed: 0.13 },
@@ -89,12 +114,10 @@ RING_DEFS.forEach(def => {
   // satellites
   const sats = [];
   for (let i = 0; i < def.count; i++) {
-    const s = new THREE.Mesh(
-      new THREE.OctahedronGeometry(0.05, 0),
-      new THREE.MeshStandardMaterial({ color: def.color, emissive: def.color, emissiveIntensity: 0.8, roughness: 0.4 })
-    );
+    const s = makePocketQube(def.color);
     const a = (i / def.count) * Math.PI * 2;
     s.position.set(Math.cos(a) * def.radius, 0, Math.sin(a) * def.radius);
+    s.rotation.y = a;  // face along orbit
     group.add(s);
     sats.push(s);
   }
@@ -157,7 +180,7 @@ function animate(now) {
 
   rings.forEach(r => {
     r.group.rotation.y += r.speed * dt;
-    r.sats.forEach(s => { const s2 = 1 + Math.sin(now * 0.003 + s.position.x) * 0.15; s.scale.setScalar(s2); });
+    r.sats.forEach(s => { s.rotation.y += dt * 0.6; });
   });
 
   stars.rotation.y += 0.0004;
