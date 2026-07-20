@@ -164,11 +164,11 @@ def log_rows(posts):
     for p in sorted(posts, key=lambda x: x["date"], reverse=True):
         cls = CAT_CLASS.get(p["category"], "log-cat-sys")
         label = CAT_LABEL.get(p["category"], p["category"].upper())
-        rows.append(f"""    <div class="log-row">
+        rows.append(f"""    <a class="log-row" href="writing/{p['slug']}.html">
       <div class="log-date">{p['date']}</div>
-      <div class="log-title"><a href="writing/{p['slug']}.html">{p['title']}</a></div>
+      <div class="log-title">{p['title']}</div>
       <div class="log-cat {cls}">{label}</div>
-    </div>""")
+    </a>""")
     return "\n".join(rows)
 
 def inject_log(index_html: str, log_block: str, count: int):

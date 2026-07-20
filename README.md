@@ -1,4 +1,4 @@
-# Limitless Labb
+# Limitless Labs
 
 A field-journal of experiments, research, and real measurements on self-hosting,
 low-power computing, and AI-on-the-edge — run from a Raspberry Pi 3 (906 MB RAM).
