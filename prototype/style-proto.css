@@ -30,17 +30,21 @@
 @keyframes hintIn{ to{ opacity: 0.7; } }
 @media (prefers-reduced-motion: reduce){ .hero-hint{ opacity: 0.7; animation: none; } }
 
-/* Scroll reveal — visible by default; only hidden when JS is active (.js on <html>) */
+/* Scroll reveal — CSS-only fade-in, always ends visible (no JS can hide it) */
 .reveal{ opacity: 1; transform: none; }
 html.js .reveal{
   opacity: 0;
   transform: translateY(28px);
-  transition: opacity 0.8s ease, transform 0.8s cubic-bezier(.16,.84,.44,1);
-  will-change: opacity, transform;
+  animation: revealIn 0.8s cubic-bezier(.16,.84,.44,1) forwards;
 }
-.reveal.is-visible{ opacity: 1; transform: none; }
+/* cascade delay so sections rise in sequence */
+html.js #about.reveal{ animation-delay: .05s; }
+html.js #projects.reveal{ animation-delay: .15s; }
+html.js #writing.reveal{ animation-delay: .25s; }
+html.js #contact.reveal{ animation-delay: .35s; }
+@keyframes revealIn{ to{ opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce){
-  html.js .reveal{ opacity: 1; transform: none; transition: none; }
+  html.js .reveal{ opacity: 1; transform: none; animation: none; }
 }
 
 /* Project cards: subtle 3D tilt on hover */
