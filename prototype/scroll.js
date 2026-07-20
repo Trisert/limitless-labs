@@ -20,6 +20,10 @@
       });
     }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
     els.forEach(function (e) { io.observe(e); });
+    // Safety net: if anything prevents the observer from firing, reveal anyway.
+    setTimeout(function () {
+      els.forEach(function (e) { e.classList.add('is-visible'); });
+    }, 1500);
   }
 
   // Subtle parallax of hero TEXT (.hero .wrap) relative to scroll
