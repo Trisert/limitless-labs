@@ -1,0 +1,2 @@
+# build.py dependencies
+markdown>=3.0

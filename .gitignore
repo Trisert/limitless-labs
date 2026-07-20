@@ -1,0 +1,4 @@
+
+# local venv (created by uv)
+.venv-pw/
+.venv/
