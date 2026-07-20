@@ -48,25 +48,76 @@ scene.add(stars);
 const earthGroup = new THREE.Group();
 scene.add(earthGroup);
 
-const earth = new THREE.Mesh(
-  new THREE.SphereGeometry(1.5, 48, 48),
-  new THREE.MeshStandardMaterial({ color: 0x1c2a36, roughness: 0.95, metalness: 0.05, emissive: 0x0a1219, emissiveIntensity: 0.4 })
-);
-earthGroup.add(earth);
+// ---- Planet with day/night terminator (custom shader) ----
+const planetUniforms = {
+  uLightDir: { value: new THREE.Vector3(1, 0.4, 0.6).normalize() },
+  uDay:      { value: new THREE.Color(0x2a3b4d) },   // lit side (steel-blue)
+  uNight:    { value: new THREE.Color(0x0a0f16) },   // dark side
+  uTerm:     { value: new THREE.Color(0xffb000) },   // terminator glow (amber)
+  uAmbient:  { value: 0.18 }
+};
+const planetMat = new THREE.ShaderMaterial({
+  uniforms: planetUniforms,
+  vertexShader: `
+    varying vec3 vNormal;
+    varying vec3 vPos;
+    void main(){
+      vNormal = normalize(normalMatrix * normal);
+      vPos = position;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
+    }`,
+  fragmentShader: `
+    uniform vec3 uLightDir;
+    uniform vec3 uDay;
+    uniform vec3 uNight;
+    uniform vec3 uTerm;
+    uniform float uAmbient;
+    varying vec3 vNormal;
+    varying vec3 vPos;
+    void main(){
+      vec3 N = normalize(vNormal);
+      // light comes from view-ish space; use world-ish dir
+      float d = dot(N, normalize(uLightDir));
+      // terminator band
+      float term = smoothstep(-0.25, 0.25, d);
+      vec3 base = mix(uNight, uDay, term);
+      // amber rim exactly at the terminator
+      float rim = exp(-pow((d)/0.18, 2.0));
+      base += uTerm * rim * 0.5;
+      base += uDay * uAmbient;
+      gl_FragColor = vec4(base, 1.0);
+    }`
+});
+const planet = new THREE.Mesh(new THREE.SphereGeometry(1.5, 64, 64), planetMat);
+earthGroup.add(planet);
 
-// faint wire latitude/longitude grid to feel "mission control"
-const grid = new THREE.Mesh(
-  new THREE.SphereGeometry(1.52, 24, 18),
-  new THREE.MeshBasicMaterial({ color: 0x6f93ac, wireframe: true, transparent: true, opacity: 0.12 })
-);
-earthGroup.add(grid);
-
-// amber atmosphere glow
-const atm = new THREE.Mesh(
-  new THREE.SphereGeometry(1.62, 32, 32),
-  new THREE.MeshBasicMaterial({ color: 0xffb000, transparent: true, opacity: 0.06, side: THREE.BackSide })
-);
+// ---- Atmosphere halo (fresnel, amber) ----
+const atmMat = new THREE.ShaderMaterial({
+  transparent: true,
+  blending: THREE.AdditiveBlending,
+  side: THREE.BackSide,
+  uniforms: { uColor: { value: new THREE.Color(0xffb000) } },
+  vertexShader: `
+    varying vec3 vN; varying vec3 vView;
+    void main(){
+      vN = normalize(normalMatrix * normal);
+      vec4 mv = modelViewMatrix * vec4(position,1.0);
+      vView = normalize(-mv.xyz);
+      gl_Position = projectionMatrix * mv;
+    }`,
+  fragmentShader: `
+    uniform vec3 uColor;
+    varying vec3 vN; varying vec3 vView;
+    void main(){
+      float f = pow(1.0 - abs(dot(vN, vView)), 2.5);
+      gl_FragColor = vec4(uColor, f * 0.6);
+    }`
+});
+const atm = new THREE.Mesh(new THREE.SphereGeometry(1.66, 48, 48), atmMat);
 earthGroup.add(atm);
+
+// Keep the day/night light direction in sync with the key light
+planetUniforms.uLightDir.value.copy(key.position).normalize();
 
 // ---------- Orbital rings + satellites ----------
 const RING_DEFS = [
