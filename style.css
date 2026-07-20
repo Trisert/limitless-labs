@@ -310,8 +310,8 @@ html.js #contact.reveal{ animation-delay: .35s; }
 .log-title a:hover{ color: var(--amber); }
 .log-cat{ font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.6px; padding: 3px 8px; border-radius: 3px; }
 .log-cat-aero{ color: var(--amber); border: 1px solid var(--amber-dim); }
-.log-cat-ai{ color: var(--steel); border: 1px solid #2E4A5B; }
-.log-cat-sys{ color: var(--text-dim); border: 1px solid var(--hairline); }
+.log-cat-ai{ color: #5EEAD4; border: 1px solid #1F6F63; background: rgba(94,234,212,0.08); }
+.log-cat-sys{ color: #C4B5FD; border: 1px solid #4C3A8C; background: rgba(196,181,253,0.08); }
 .log-empty{ background: var(--panel); padding: 48px 24px; text-align: center; color: var(--text-dim); }
 .log-empty .glyph{ font-family: var(--font-mono); font-size: 32px; color: var(--amber); margin-bottom: 12px; }
 

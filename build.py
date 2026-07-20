@@ -145,7 +145,7 @@ def article_page(post):
 {json_ld}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../style.css?v=2"/>
+<link rel="stylesheet" href="../style.css?v=3"/>
 </head>
 <body>
 <div class="wrap"><nav style="padding:22px 0">
