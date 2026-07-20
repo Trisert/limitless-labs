@@ -76,10 +76,10 @@ The "rapid iteration" isn't a slogan — it's visible in the deployment curve. T
   </g>
   <!-- legend -->
   <g font-size="10">
-    <rect x="380" y="30" width="12" height="3" fill="#FFB000"/>
-    <text x="398" y="34" fill="#FFB000">satellites in orbit (~10.4k, 2026)</text>
-    <rect x="380" y="46" width="12" height="3" fill="#6F93AC"/>
-    <text x="398" y="50" fill="#6F93AC">subscribers (~10M, 2026)</text>
+    <rect x="60" y="40" width="12" height="3" fill="#FFB000"/>
+    <text x="78" y="44" fill="#FFB000">sats in orbit (~10.4k, 2026)</text>
+    <rect x="60" y="56" width="12" height="3" fill="#6F93AC"/>
+    <text x="78" y="60" fill="#6F93AC">subs (~10M, 2026)</text>
   </g>
 </svg>
 </div>

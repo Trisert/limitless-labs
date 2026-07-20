@@ -153,7 +153,6 @@ def article_page(post):
 </nav></div>
 <main class="post"><div class="wrap">
   {cat_line}
-  <h1>{post['title']}</h1>
   <div class="prose">{post['html']}</div>
   <p style="margin-top:48px"><a href="../#writing" style="color:var(--steel)">&larr; Back to transmission log</a></p>
 </div></main>

@@ -364,3 +364,7 @@ footer{ padding: 64px 0 40px; }
   .card{ transform: none; }
   .card:hover{ transform: none; box-shadow: none; }
 }
+
+/* ---------- Article chart (inline SVG, mission-control theme) ---------- */
+.chart{ margin: 28px 0; }
+.chart svg{ width: 100%; height: auto; max-width: 640px; display: block; }
