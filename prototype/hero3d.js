@@ -64,31 +64,6 @@ const planetMat = new THREE.MeshStandardMaterial({
 const planet = new THREE.Mesh(new THREE.SphereGeometry(1.5, 64, 64), planetMat);
 earthGroup.add(planet);
 
-// ---- Atmosphere halo (fresnel, amber) ----
-const atmMat = new THREE.ShaderMaterial({
-  transparent: true,
-  blending: THREE.AdditiveBlending,
-  side: THREE.BackSide,
-  uniforms: { uColor: { value: new THREE.Color(0xffd27a) } },
-  vertexShader: `
-    varying vec3 vN; varying vec3 vView;
-    void main(){
-      vN = normalize(normalMatrix * normal);
-      vec4 mv = modelViewMatrix * vec4(position,1.0);
-      vView = normalize(-mv.xyz);
-      gl_Position = projectionMatrix * mv;
-    }`,
-  fragmentShader: `
-    uniform vec3 uColor;
-    varying vec3 vN; varying vec3 vView;
-    void main(){
-      float f = pow(1.0 - abs(dot(vN, vView)), 3.0);
-      gl_FragColor = vec4(uColor, f * 0.35);
-    }`
-});
-const atm = new THREE.Mesh(new THREE.SphereGeometry(1.66, 48, 48), atmMat);
-earthGroup.add(atm);
-
 // ---------- Orbital rings + satellites ----------
 const RING_DEFS = [
   { radius: 2.4, count: 7, tilt: 0.35, color: 0xffb000, speed: 0.18 },
