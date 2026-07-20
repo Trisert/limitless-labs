@@ -69,7 +69,7 @@ const atmMat = new THREE.ShaderMaterial({
   transparent: true,
   blending: THREE.AdditiveBlending,
   side: THREE.BackSide,
-  uniforms: { uColor: { value: new THREE.Color(0xffb000) } },
+  uniforms: { uColor: { value: new THREE.Color(0xffd27a) } },
   vertexShader: `
     varying vec3 vN; varying vec3 vView;
     void main(){
@@ -82,8 +82,8 @@ const atmMat = new THREE.ShaderMaterial({
     uniform vec3 uColor;
     varying vec3 vN; varying vec3 vView;
     void main(){
-      float f = pow(1.0 - abs(dot(vN, vView)), 2.5);
-      gl_FragColor = vec4(uColor, f * 0.6);
+      float f = pow(1.0 - abs(dot(vN, vView)), 3.0);
+      gl_FragColor = vec4(uColor, f * 0.35);
     }`
 });
 const atm = new THREE.Mesh(new THREE.SphereGeometry(1.66, 48, 48), atmMat);
