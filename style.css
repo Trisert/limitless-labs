@@ -327,12 +327,25 @@ footer{ padding: 64px 0 40px; }
 .contact-links a:hover{ color: var(--amber); border-color: var(--amber); }
 .foot-meta{ font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); margin-top: 40px; }
 
-/* ---------- Article page prose ---------- */
-.prose{ max-width: 720px; color: var(--text-dim); }
-.prose p{ margin-bottom: 18px; font-size: 16px; }
-.prose h2, .prose h3{ color: var(--text); margin: 32px 0 14px; }
-.prose pre{ background: #0E1013; border: 1px solid var(--hairline); border-radius: 6px; padding: 16px; overflow:auto; font-family: var(--font-mono); font-size: 13px; }
-.prose code{ font-family: var(--font-mono); font-size: 0.9em; background: #0E1013; padding: 1px 5px; border-radius: 3px; }
+/* ---------- Article page (OpenAI-dev-blog dark style) ---------- */
+.post{ padding: 64px 0 40px; }
+.post .wrap{ display: flex; justify-content: center; }
+.prose{ width: 100%; max-width: 680px; color: #d6d8db; font-size: 17px; line-height: 1.7; }
+.prose h1{ font-family: var(--font-display); font-size: clamp(30px, 6vw, 40px); line-height: 1.15; color: #f2f3f4; letter-spacing: -0.01em; margin: 14px 0 8px; }
+.prose h2{ font-family: var(--font-display); font-size: clamp(22px, 4vw, 27px); line-height: 1.25; color: #f2f3f4; margin: 44px 0 12px; padding-top: 8px; }
+.prose h3{ font-size: 19px; color: #e9eaec; margin: 32px 0 10px; }
+.prose p{ margin-bottom: 20px; }
+.prose ul{ margin: 0 0 20px; padding-left: 22px; }
+.prose li{ margin-bottom: 8px; }
+.prose a{ color: #e0a743; text-decoration: none; border-bottom: 1px solid rgba(224,167,67,0.35); }
+.prose a:hover{ border-bottom-color: #e0a743; }
+.prose strong{ color: #f2f3f4; font-weight: 600; }
+.prose em{ color: #b9bdc2; }
+.prose hr{ border: none; border-top: 1px solid var(--hairline); margin: 36px 0; }
+.prose pre{ background: #16191e; border: 1px solid var(--hairline); border-radius: 8px; padding: 16px 18px; overflow:auto; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.55; color: #cfd3d8; }
+.prose code{ font-family: var(--font-mono); font-size: 0.88em; background: #1c2026; border: 1px solid var(--hairline); padding: 1px 6px; border-radius: 4px; color: #e6c08a; }
+.prose pre code{ background: none; border: none; padding: 0; color: inherit; }
+.log-date{ font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); }
 
 /* ===== Mobile / touch ===== */
 @media (max-width: 760px){

@@ -58,7 +58,7 @@ The "rapid iteration" isn't a slogan — it's visible in the deployment curve. T
   <line x1="60" y1="20" x2="60" y2="260" stroke="#2B303A" stroke-width="1"/>
   <line x1="60" y1="260" x2="620" y2="260" stroke="#2B303A" stroke-width="1"/>
   <!-- satellites line (left axis, 0..11000) -->
-  <polyline fill="none" stroke="#FFB000" stroke-width="2.5"
+  <polyline fill="none" stroke="#E0A743" stroke-width="2.5"
     points="60,254 143,238 226,214 309,182 392,150 475,116 558,28"/>
   <!-- subscribers line (right axis, 0..10M, scaled to same height) -->
   <polyline fill="none" stroke="#6F93AC" stroke-width="2" stroke-dasharray="4 3"
@@ -76,8 +76,8 @@ The "rapid iteration" isn't a slogan — it's visible in the deployment curve. T
   </g>
   <!-- legend -->
   <g font-size="10">
-    <rect x="60" y="40" width="12" height="3" fill="#FFB000"/>
-    <text x="78" y="44" fill="#FFB000">sats in orbit (~10.4k, 2026)</text>
+    <rect x="60" y="40" width="12" height="3" fill="#E0A743"/>
+    <text x="78" y="44" fill="#E0A743">sats in orbit (~10.4k, 2026)</text>
     <rect x="60" y="56" width="12" height="3" fill="#6F93AC"/>
     <text x="78" y="60" fill="#6F93AC">subs (~10M, 2026)</text>
   </g>
