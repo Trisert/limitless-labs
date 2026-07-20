@@ -6,18 +6,6 @@
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://trisert.github.io/limitless-labs/writing/2026-07-18-silence-of-the-moon.html</loc>
-    <lastmod>2026-07-18</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://trisert.github.io/limitless-labs/writing/2026-07-18-why-906mb-pi.html</loc>
-    <lastmod>2026-07-18</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
     <loc>https://trisert.github.io/limitless-labs/writing/2026-07-20-living-on-a-raspberry-pi.html</loc>
     <lastmod>2026-07-20</lastmod>
     <changefreq>monthly</changefreq>
@@ -26,12 +14,6 @@
   <url>
     <loc>https://trisert.github.io/limitless-labs/writing/2026-07-20-starlink-v3-integration.html</loc>
     <lastmod>2026-07-20</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://trisert.github.io/limitless-labs/writing/2026-07-18-agents-and-search.html</loc>
-    <lastmod>2026-07-18</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
