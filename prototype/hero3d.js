@@ -185,12 +185,18 @@ window.addEventListener('scroll', () => {
 function resize() {
   const w = canvas.clientWidth || window.innerWidth;
   const h = canvas.clientHeight || window.innerHeight;
+  if (!w || !h) return;            // layout not ready yet
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
 }
 window.addEventListener('resize', resize);
 resize();
+// Re-fit once layout settles (handles headless / late mobile layout)
+if ('ResizeObserver' in window) {
+  new ResizeObserver(resize).observe(canvas);
+}
+setTimeout(resize, 300);
 
 // ---------- Animate ----------
 let last = performance.now();
