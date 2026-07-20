@@ -171,12 +171,6 @@ function animate(now) {
 requestAnimationFrame(animate);
 
 // fade out the hint after first interaction
-const hint = document.getElementById('heroHint');
-if (hint) {
-  window.addEventListener('pointerdown', () => hint.style.opacity = '0', { once: true });
-  setTimeout(() => { if (hint) hint.style.opacity = '0'; }, 6000);
-}
-
 } catch (err) {
   // WebGL unavailable or Three failed to load: leave the CSS gradient background.
   console.warn('hero3d disabled:', err);
