@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Walk — Limitless Labs</title>
+<link rel="stylesheet" href="../style.css?v=3">
+<style>
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#0b0d0f}
+  #walk-canvas{position:fixed;inset:0;display:block;width:100%;height:100%}
+  .walk-ui{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);display:flex;gap:12px;z-index:10}
+  .walk-chip{background:rgba(11,13,15,.55);border:1px solid rgba(224,167,67,.25);color:#e6e6e6;padding:10px 14px;border-radius:999px;backdrop-filter:blur(6px);font:14px/1.2 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+  .walk-chip .accent{color:#e0a743}
+  .walk-hint{position:fixed;left:50%;top:16px;transform:translateX(-50%);color:#cfd3d6;background:rgba(11,13,15,.45);border:1px solid rgba(224,167,67,.18);padding:8px 12px;border-radius:10px;backdrop-filter:blur(6px);font:12px/1.3 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;z-index:10;opacity:.9}
+</style>
+</head>
+<body>
+<canvas id="walk-canvas" aria-label="Procedural infinite walk through a national park landscape"></canvas>
+<div class="walk-hint">Click &amp; drag to look &nbsp;·&nbsp; Walk automatically &nbsp;·&nbsp; Scroll to adjust pace</div>
+<div class="walk-ui">
+  <div class="walk-chip" id="chip-pace">PACE <span class="accent" id="pace">1.0x</span></div>
+  <div class="walk-chip" id="chip-dist">DIST <span class="accent" id="dist">0.00</span> <span style="opacity:.7">km</span></div>
+  <div class="walk-chip" id="chip-elev">ELEV <span class="accent" id="elev">0</span> <span style="opacity:.7">m</span></div>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "../vendor/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+const canvas = document.getElementById('walk-canvas');
+const paceEl = document.getElementById('pace');
+const distEl = document.getElementById('dist');
+const elevEl = document.getElementById('elev');
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = false;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#b7c8d8');
+scene.fog = new THREE.Fog('#b7c8d8', 60, 260);
+
+const camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.5, 500);
+camera.position.set(0, 3.2, 0);
+
+// ---- Lighting (national park feel) ----
+const sun = new THREE.DirectionalLight('#fff3d6', 1.6);
+sun.position.set(120, 80, -40);
+scene.add(sun);
+scene.add(new THREE.HemisphereLight('#aec6e0', '#5c6b4f', 0.85));
+
+// ---- Terrain palette ----
+const palette = {
+  grassLow: new THREE.Color('#4f6632'),
+  grassHigh: new THREE.Color('#6e8040'),
+  rock: new THREE.Color('#7a7268'),
+  rockLight: new THREE.Color('#9e9688'),
+  snow: new THREE.Color('#e8ecf2'),
+  water: new THREE.Color('#3b5d72'),
+  dirt: new THREE.Color('#6b604a'),
+};
+
+// ---- Simple value noise ----
+function hash(x, z) {
+  let n = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453;
+  return n - Math.floor(n);
+}
+function smooth(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function noise(x, z) {
+  const ix = Math.floor(x), iz = Math.floor(z);
+  const fx = smooth(x - ix), fz = smooth(z - iz);
+  const a = hash(ix, iz), b = hash(ix + 1, iz);
+  const c = hash(ix, iz + 1), d = hash(ix + 1, iz + 1);
+  return lerp(lerp(a, b, fx), lerp(c, d, fx), fz);
+}
+function fbm(x, z, octaves = 4) {
+  let v = 0, amp = 0.5, freq = 1;
+  for (let i = 0; i < octaves; i++) { v += amp * noise(x * freq, z * freq); amp *= 0.5; freq *= 2.1; }
+  return v;
+}
+
+// ---- Terrain geometry builder ----
+const CHUNK = 80;
+const SEG = 80;
+const VERT = SEG + 1;
+
+function buildChunkMesh(cx, cz) {
+  const geom = new THREE.PlaneGeometry(CHUNK, CHUNK, SEG, SEG);
+  geom.rotateX(-Math.PI / 2);
+  const pos = geom.attributes.position;
+  const colors = new Float32Array(pos.count * 3);
+
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i) + cx;
+    const z = pos.getZ(i) + cz;
+    let h = 0;
+    // broad shape
+    h += fbm(x * 0.012, z * 0.012, 4) * 22;
+    // detail
+    h += fbm(x * 0.045 + 5.3, z * 0.045 + 9.1, 3) * 6;
+    // ridgelines
+    const ridge = 1 - Math.abs(fbm(x * 0.018 + 1.7, z * 0.018 + 3.2, 3) * 2 - 1);
+    h += ridge * 10;
+    pos.setY(i, h);
+
+    // color by height + slope
+    const y = h;
+    let col = palette.grassLow.clone();
+    if (y > 14) col = palette.grassHigh.clone().lerp(palette.rockLight, Math.min((y - 14) / 10, 1));
+    if (y > 22) col = palette.rockLight.clone().lerp(palette.rock, Math.min((y - 22) / 8, 1));
+    if (y > 30) col = palette.rock.clone().lerp(palette.snow, Math.min((y - 30) / 8, 1));
+    // micro slope darkening
+    const slope = Math.abs(ridge);
+    col.multiplyScalar(1 - slope * 0.15);
+
+    colors[i * 3] = col.r;
+    colors[i * 3 + 1] = col.g;
+    colors[i * 3 + 2] = col.b;
+  }
+  geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geom.computeVertexNormals();
+  const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
+  return new THREE.Mesh(geom, mat);
+}
+
+// ---- Water plane ----
+const waterGeom = new THREE.PlaneGeometry(CHUNK * 3, CHUNK * 3);
+waterGeom.rotateX(-Math.PI / 2);
+const waterMat = new THREE.MeshLambertMaterial({ color: palette.water, transparent: true, opacity: 0.78 });
+const water = new THREE.Mesh(waterGeom, waterMat);
+water.position.y = 1.2;
+scene.add(water);
+
+// ---- Low-poly trees ----
+const trunkGeom = new THREE.CylinderGeometry(0.15, 0.22, 1.4, 5);
+const foliageGeom = new THREE.ConeGeometry(0.9, 2.2, 6, 1);
+const trunkMat = new THREE.MeshLambertMaterial({ color: '#4a3b2f' });
+const foliageMat = new THREE.MeshLambertMaterial({ color: '#2f4025' });
+const foliageAltMat = new THREE.MeshLambertMaterial({ color: '#3a4f30' });
+
+function treeAt(x, z) {
+  const h = sampleHeight(x, z);
+  if (h < 2.8 || h > 26) return null;
+  const group = new THREE.Group();
+  const trunk = new THREE.Mesh(trunkGeom, trunkMat);
+  trunk.position.y = 0.7;
+  group.add(trunk);
+  const f1 = new THREE.Mesh(foliageGeom, Math.random() > 0.5 ? foliageMat : foliageAltMat);
+  f1.position.y = 1.9;
+  group.add(f1);
+  const f2 = new THREE.Mesh(foliageGeom, Math.random() > 0.5 ? foliageMat : foliageAltMat);
+  f2.position.y = 3.0;
+  f2.scale.setScalar(0.75);
+  group.add(f2);
+  group.position.set(x, h, z);
+  const s = 0.75 + Math.random() * 1.1;
+  group.scale.setScalar(s);
+  group.rotation.y = Math.random() * Math.PI * 2;
+  return group;
+}
+
+// ---- Sample height anywhere ----
+function sampleHeight(x, z) {
+  let h = 0;
+  h += fbm(x * 0.012, z * 0.012, 4) * 22;
+  h += fbm(x * 0.045 + 5.3, z * 0.045 + 9.1, 3) * 6;
+  const ridge = 1 - Math.abs(fbm(x * 0.018 + 1.7, z * 0.018 + 3.2, 3) * 2 - 1);
+  h += ridge * 10;
+  return h;
+}
+
+// ---- Chunk pool and recycling ----
+const CHUNKS_RADIUS = 2;
+const chunks = new Map();
+const treeGroup = new THREE.Group();
+scene.add(treeGroup);
+
+function chunkKey(cx, cz) { return `${cx},${cz}`; }
+
+function ensureChunk(cx, cz) {
+  const key = chunkKey(cx, cz);
+  if (chunks.has(key)) return;
+  const mesh = buildChunkMesh(cx * CHUNK, cz * CHUNK);
+  scene.add(mesh);
+  chunks.set(key, mesh);
+
+  // scatter trees on this chunk
+  const step = 6;
+  for (let lx = -CHUNK / 2; lx < CHUNK / 2; lx += step) {
+    for (let lz = -CHUNK / 2; lz < CHUNK / 2; lz += step) {
+      if (Math.random() > 0.55) continue;
+      const wx = cx * CHUNK + lx + (Math.random() - 0.5) * step;
+      const wz = cz * CHUNK + lz + (Math.random() - 0.5) * step;
+      const t = treeAt(wx, wz);
+      if (t) treeGroup.add(t);
+    }
+  }
+}
+
+function removeChunk(cx, cz) {
+  const key = chunkKey(cx, cz);
+  const mesh = chunks.get(key);
+  if (!mesh) return;
+  scene.remove(mesh);
+  geomDispose(mesh.geometry);
+  chunks.delete(key);
+}
+
+function geomDispose(geom) {
+  if (!geom) return;
+  const attr = geom.attributes;
+  if (attr.color) geom.deleteAttribute('color');
+  geom.dispose();
+}
+
+// preload initial ring
+for (let x = -CHUNKS_RADIUS; x <= CHUNKS_RADIUS; x++) {
+  for (let z = -CHUNKS_RADIUS; z <= CHUNKS_RADIUS; z++) ensureChunk(x, z);
+}
+
+// ---- Walk state ----
+const state = {
+  speed: 4.5, // units/sec
+  distance: 0,
+  yaw: 0,
+  pitch: 0.35,
+  bob: 0,
+};
+
+// simple drag look
+let dragging = false;
+let prevMouse = { x: 0, y: 0 };
+canvas.addEventListener('pointerdown', (e) => { dragging = true; prevMouse.x = e.clientX; prevMouse.y = e.clientY; });
+window.addEventListener('pointerup', () => { dragging = false; });
+window.addEventListener('pointermove', (e) => {
+  if (!dragging) return;
+  const dx = e.clientX - prevMouse.x;
+  const dy = e.clientY - prevMouse.y;
+  state.yaw -= dx * 0.004;
+  state.pitch -= dy * 0.004;
+  state.pitch = Math.max(-0.4, Math.min(1.1, state.pitch));
+  prevMouse.x = e.clientX;
+  prevMouse.y = e.clientY;
+});
+window.addEventListener('wheel', (e) => {
+  state.speed *= e.deltaY < 0 ? 1.08 : 0.92;
+  state.speed = Math.max(1.2, Math.min(18, state.speed));
+  paceEl.textContent = (state.speed / 4.5).toFixed(1) + 'x';
+}, { passive: true });
+
+// ---- Animation loop ----
+const clock = new THREE.Clock();
+function tick() {
+  const dt = Math.min(clock.getDelta(), 0.1);
+  const forward = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(0, state.yaw, 0));
+  camera.position.addScaledVector(forward, state.speed * dt);
+  state.distance += state.speed * dt;
+
+  // keep camera near terrain
+  const ground = sampleHeight(camera.position.x, camera.position.z);
+  const targetY = ground + 2.2;
+  camera.position.y += (targetY - camera.position.y) * Math.min(dt * 3.5, 1);
+  state.bob += dt * state.speed * 1.1;
+  camera.position.y += Math.sin(state.bob) * 0.08;
+
+  camera.rotation.order = 'YXZ';
+  camera.rotation.y = state.yaw;
+  camera.rotation.x = state.pitch;
+
+  // follow water
+  water.position.x = camera.position.x;
+  water.position.z = camera.position.z;
+
+  // recycle chunks
+  const cx = Math.round(camera.position.x / CHUNK);
+  const cz = Math.round(camera.position.z / CHUNK);
+  const desired = new Set();
+  for (let x = cx - CHUNKS_RADIUS; x <= cx + CHUNKS_RADIUS; x++) {
+    for (let z = cz - CHUNKS_RADIUS; z <= cz + CHUNKS_RADIUS; z++) {
+      desired.add(chunkKey(x, z));
+      ensureChunk(x, z);
+    }
+  }
+  for (const [key] of chunks) {
+    if (!desired.has(key)) {
+      const [a, b] = key.split(',').map(Number);
+      removeChunk(a, b);
+    }
+  }
+
+  // HUD
+  distEl.textContent = (state.distance / 1000).toFixed(2);
+  elevEl.textContent = Math.round(camera.position.y * 10) / 10;
+
+  renderer.render(scene, camera);
+  requestAnimationFrame(tick);
+}
+tick();
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
