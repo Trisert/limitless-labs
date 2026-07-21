@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Walk — Limitless Labs</title>
-<link rel="stylesheet" href="../style.css?v=3">
-<style>
+<link rel="stylesheet" href="/limitless-labs/style.css?v=3">
+<style id="walk-inline-css">
   html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#0b0d0f}
   #walk-canvas{position:fixed;inset:0;display:block;width:100%;height:100%}
   .walk-ui{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);display:flex;gap:12px;z-index:10}
@@ -39,12 +39,16 @@ const distEl = document.getElementById('dist');
 const elevEl = document.getElementById('elev');
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+if (!renderer.capabilities.isWebGL2) {
+  loading.textContent = 'WEBGL UNAVAILABLE — try a modern browser';
+}
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = false;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.35;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.onerror = (e) => { console.error('WebGL error:', e); loading.textContent = 'RENDER ERROR — refresh'; };
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.5, 800);
@@ -273,6 +277,47 @@ void main() {
 // ============================================================
 // MATERIALS
 // ============================================================
+// ============================================================
+// TEXTURES — procedural, no external assets
+// ============================================================
+function makeTexture(size, fn) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const d = img.data;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const i = (y * size + x) * 4;
+      const [r, g, b, a] = fn(x / size, y / size);
+      d[i] = r; d[i+1] = g; d[i+2] = b; d[i+3] = a;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.generateMipmaps = true;
+  tex.needsUpdate = true;
+  return tex;
+}
+const grassTex = makeTexture(128, (u, v) => {
+  const n = ((Math.sin(u*37.3+v*11.7)*0.5+0.5)*0.15 + (Math.sin(u*13.1+v*29.9)*0.5+0.5)*0.1 + 0.65);
+  return [n*120+80, n*180+100, n*90+60, 255];
+});
+const dirtTex = makeTexture(128, (u, v) => {
+  const n = ((Math.sin(u*23.7+v*41.1)*0.5+0.5)*0.2 + (Math.sin(u*57.3+v*19.3)*0.5+0.5)*0.15 + 0.55);
+  return [n*140+80, n*100+60, n*70+40, 255];
+});
+const rockTex = makeTexture(128, (u, v) => {
+  const n = ((Math.sin(u*53.1+v*31.7)*0.5+0.5)*0.25 + (Math.sin(u*17.9+v*47.3)*0.5+0.5)*0.2 + 0.45);
+  return [n*130+80, n*120+70, n*110+60, 255];
+});
+const snowTex = makeTexture(128, (u, v) => {
+  const n = ((Math.sin(u*31.3+v*23.1)*0.5+0.5)*0.08 + 0.88);
+  return [n*255, n*252, n*255, 255];
+});
+
 const sunDir = new THREE.Vector3(200, 140, -90).normalize();
 
 const terrainMaterial = new THREE.ShaderMaterial({
@@ -281,6 +326,10 @@ const terrainMaterial = new THREE.ShaderMaterial({
   uniforms: {
     uTime: { value: 0 },
     uSunDir: { value: sunDir },
+    uGrassTex: { value: grassTex },
+    uDirtTex: { value: dirtTex },
+    uRockTex: { value: rockTex },
+    uSnowTex: { value: snowTex },
   },
 });
 
@@ -310,8 +359,8 @@ const skyGeo = new THREE.SphereGeometry(400, 32, 32);
 const skyMesh = new THREE.Mesh(skyGeo, skyMaterial);
 scene.add(skyMesh);
 
-const CHUNK = 120;
-const SEG = 100;
+const CHUNK = 96;
+const SEG = 64;
 const chunks = new Map();
 function chunkKey(cx, cz) { return `${cx},${cz}`; }
 function ensureChunk(cx, cz) {
@@ -356,7 +405,7 @@ const foliageMats = [
   new THREE.MeshStandardMaterial({ color: '#4a5a3a', roughness: 0.84 }),
 ];
 
-const MAX_TREES = 14000;
+const MAX_TREES = 6000;
 const trunkInstanced = new THREE.InstancedMesh(trunkGeom, trunkMat, MAX_TREES);
 const foliageInstanced = new THREE.InstancedMesh(foliageGeom, foliageMats[0], MAX_TREES * 2);
 trunkInstanced.castShadow = false;
@@ -422,12 +471,12 @@ function buildInstancedTrees() {
 
 const rockGeom = new THREE.DodecahedronGeometry(0.45, 0);
 const rockMat = new THREE.MeshStandardMaterial({ color: '#6e685f', roughness: 0.7, flatShading: true });
-const rockInstanced = new THREE.InstancedMesh(rockGeom, rockMat, 8000);
+const rockInstanced = new THREE.InstancedMesh(rockGeom, rockMat, 4000);
 scene.add(rockInstanced);
 
 const bushGeom = new THREE.SphereGeometry(0.55, 5, 4);
 const bushMat = new THREE.MeshStandardMaterial({ color: '#3a4f30', roughness: 0.9, flatShading: true });
-const bushInstanced = new THREE.InstancedMesh(bushGeom, bushMat, 6000);
+const bushInstanced = new THREE.InstancedMesh(bushGeom, bushMat, 3000);
 scene.add(bushInstanced);
 
 const groundData = [];
@@ -544,6 +593,8 @@ function tick() {
 
 loading.classList.add('hidden');
 tick();
+// safety: hide loading after 3s even if tick stalls
+setTimeout(() => loading.classList.add('hidden'), 3000);
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
