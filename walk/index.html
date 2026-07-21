@@ -48,13 +48,18 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = false;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.15;
+renderer.toneMappingExposure = 1.45;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.onerror = (e) => { console.error('WebGL error:', e); loading.textContent = 'RENDER ERROR — refresh'; };
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1.0, 1200);
 camera.position.set(0, 4.2, 0);
+
+const ambientLight = new THREE.AmbientLight('#b8c8d8', 0.9);
+const sunLight = new THREE.DirectionalLight('#fff4e0', 2.4);
+sunLight.position.copy(sunDir).multiplyScalar(120);
+scene.add(ambientLight, sunLight);
 
 // ============================================================
 // SKY — atmospheric Rayleigh/Mie approximation
