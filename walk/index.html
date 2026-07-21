@@ -12,15 +12,18 @@
   .walk-chip{background:rgba(11,13,15,.55);border:1px solid rgba(224,167,67,.25);color:#e6e6e6;padding:10px 14px;border-radius:999px;backdrop-filter:blur(6px);font:14px/1.2 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
   .walk-chip .accent{color:#e0a743}
   .walk-hint{position:fixed;left:50%;top:16px;transform:translateX(-50%);color:#cfd3d6;background:rgba(11,13,15,.45);border:1px solid rgba(224,167,67,.18);padding:8px 12px;border-radius:10px;backdrop-filter:blur(6px);font:12px/1.3 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;z-index:10;opacity:.9}
+  .loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0b0d0f;color:#e0a743;font:14px/1.2 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;z-index:20;transition:opacity .8s}
+  .loading.hidden{opacity:0;pointer-events:none}
 </style>
 </head>
 <body>
 <canvas id="walk-canvas" aria-label="Procedural infinite walk through a national park landscape"></canvas>
+<div class="loading" id="loading">GENERATING WORLD...</div>
 <div class="walk-hint">Click &amp; drag to look &nbsp;·&nbsp; Walk automatically &nbsp;·&nbsp; Scroll to adjust pace</div>
 <div class="walk-ui">
-  <div class="walk-chip" id="chip-pace">PACE <span class="accent" id="pace">1.0x</span></div>
-  <div class="walk-chip" id="chip-dist">DIST <span class="accent" id="dist">0.00</span> <span style="opacity:.7">km</span></div>
-  <div class="walk-chip" id="chip-elev">ELEV <span class="accent" id="elev">0</span> <span style="opacity:.7">m</span></div>
+  <div class="walk-chip">PACE <span class="accent" id="pace">1.0x</span></div>
+  <div class="walk-chip">DIST <span class="accent" id="dist">0.00</span> <span style="opacity:.7">km</span></div>
+  <div class="walk-chip">ELEV <span class="accent" id="elev">0</span> <span style="opacity:.7">m</span></div>
 </div>
 
 <script type="importmap">
@@ -30,6 +33,7 @@
 import * as THREE from 'three';
 
 const canvas = document.getElementById('walk-canvas');
+const loading = document.getElementById('loading');
 const paceEl = document.getElementById('pace');
 const distEl = document.getElementById('dist');
 const elevEl = document.getElementById('elev');
@@ -39,33 +43,179 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = false;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.05;
+renderer.toneMappingExposure = 1.15;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color('#b7c8d8');
-scene.fog = new THREE.Fog('#b7c8d8', 60, 260);
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.5, 500);
+camera.position.set(0, 3.5, 0);
 
-const camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.5, 500);
-camera.position.set(0, 3.2, 0);
+// ============================================================
+// TEXTURE GENERATION (procedural tiling textures)
+// ============================================================
+function createCanvas(size = 512) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  return { canvas: c, ctx: c.getContext('2d'), size };
+}
 
-// ---- Lighting (national park feel) ----
-const sun = new THREE.DirectionalLight('#fff3d6', 1.6);
-sun.position.set(120, 80, -40);
+function addNoise(ctx, size, intensity = 18) {
+  const img = ctx.getImageData(0, 0, size, size);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const n = (Math.random() - 0.5) * intensity;
+    d[i] = Math.max(0, Math.min(255, d[i] + n));
+    d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + n));
+    d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + n));
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+function makeNormalMap(size = 512, strength = 2.5) {
+  const { canvas: c, ctx } = createCanvas(size);
+  ctx.fillStyle = '#8080ff';
+  ctx.fillRect(0, 0, size, size);
+  addNoise(ctx, size, 35);
+  const img = ctx.getImageData(0, 0, size, size);
+  const d = img.data;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const idx = (y * size + x) * 4;
+      const l = d[idx], r = d[((y * size) + ((x + 1) % size)) * 4];
+      const u = d[idx], dn = d[((((y + 1) % size) * size) + x) * 4];
+      const dx = (l - r) / 255 * strength;
+      const dy = (u - dn) / 255 * strength;
+      d[idx] = Math.max(0, Math.min(255, 128 + dx * 127));
+      d[idx + 1] = Math.max(0, Math.min(255, 128 + dy * 127));
+      d[idx + 2] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return new THREE.CanvasTexture(c);
+}
+
+function makeRoughnessMap(size = 512, base = 0.75, variance = 0.2) {
+  const { canvas: c, ctx } = createCanvas(size);
+  ctx.fillStyle = `rgb(${Math.round(base * 255)},${Math.round(base * 255)},${Math.round(base * 255)})`;
+  ctx.fillRect(0, 0, size, size);
+  addNoise(ctx, size, variance * 255);
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
+function makeGrassTexture(size = 512) {
+  const { canvas: c, ctx } = createCanvas(size);
+  ctx.fillStyle = '#4f6632';
+  ctx.fillRect(0, 0, size, size);
+  for (let i = 0; i < 25000; i++) {
+    const x = Math.random() * size, y = Math.random() * size;
+    ctx.fillStyle = `rgba(${75 + Math.random()*30},${100 + Math.random()*35},${40 + Math.random()*25},0.7)`;
+    ctx.fillRect(x, y, 1 + Math.random() * 2, 1 + Math.random() * 4);
+  }
+  addNoise(ctx, size, 12);
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function makeRockTexture(size = 512) {
+  const { canvas: c, ctx } = createCanvas(size);
+  ctx.fillStyle = '#7a7268';
+  ctx.fillRect(0, 0, size, size);
+  for (let i = 0; i < 8000; i++) {
+    const x = Math.random() * size, y = Math.random() * size;
+    ctx.fillStyle = `rgba(${120 + Math.random()*40},${110 + Math.random()*35},${100 + Math.random()*30},0.6)`;
+    ctx.fillRect(x, y, 2 + Math.random() * 8, 2 + Math.random() * 6);
+  }
+  addNoise(ctx, size, 15);
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function makeDirtTexture(size = 512) {
+  const { canvas: c, ctx } = createCanvas(size);
+  ctx.fillStyle = '#6b604a';
+  ctx.fillRect(0, 0, size, size);
+  for (let i = 0; i < 15000; i++) {
+    const x = Math.random() * size, y = Math.random() * size;
+    ctx.fillStyle = `rgba(${100 + Math.random()*25},${90 + Math.random()*20},${65 + Math.random()*20},0.5)`;
+    ctx.fillRect(x, y, 1 + Math.random() * 3, 1 + Math.random() * 3);
+  }
+  addNoise(ctx, size, 10);
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function makeSnowTexture(size = 512) {
+  const { canvas: c, ctx } = createCanvas(size);
+  ctx.fillStyle = '#e8ecf2';
+  ctx.fillRect(0, 0, size, size);
+  for (let i = 0; i < 20000; i++) {
+    const x = Math.random() * size, y = Math.random() * size;
+    const a = Math.random() * 0.3;
+    ctx.fillStyle = `rgba(255,255,255,${a})`;
+    ctx.fillRect(x, y, 1 + Math.random() * 2, 1 + Math.random() * 2);
+  }
+  addNoise(ctx, size, 8);
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+const grassTex = makeGrassTexture();
+const rockTex = makeRockTexture();
+const dirtTex = makeDirtTexture();
+const snowTex = makeSnowTexture();
+const grassNormal = makeNormalMap(512, 2.0);
+const rockNormal = makeNormalMap(512, 3.5);
+const grassRoughness = makeRoughnessMap(512, 0.85, 0.15);
+const rockRoughness = makeRoughnessMap(512, 0.55, 0.25);
+
+// ============================================================
+// SKY
+// ============================================================
+const skyCanvas = document.createElement('canvas');
+skyCanvas.width = 2; skyCanvas.height = 512;
+const skyCtx = skyCanvas.getContext('2d');
+const skyGrad = skyCtx.createLinearGradient(0, 0, 0, 512);
+skyGrad.addColorStop(0.0, '#4a6fa5');
+skyGrad.addColorStop(0.25, '#87a7c9');
+skyGrad.addColorStop(0.55, '#c5d5e0');
+skyGrad.addColorStop(0.75, '#d8cdb8');
+skyGrad.addColorStop(0.9, '#c9a87c');
+skyGrad.addColorStop(1.0, '#8b7355');
+skyCtx.fillStyle = skyGrad;
+skyCtx.fillRect(0, 0, 2, 512);
+const skyTex = new THREE.CanvasTexture(skyCanvas);
+skyTex.mapping = THREE.EquirectangularReflectionMapping;
+scene.background = skyTex;
+
+// ============================================================
+// FOG
+// ============================================================
+scene.fog = new THREE.FogExp2('#c5d5e0', 0.0018);
+
+// ============================================================
+// LIGHTING
+// ============================================================
+const sun = new THREE.DirectionalLight('#fff3d6', 2.2);
+sun.position.set(150, 100, -60);
 scene.add(sun);
-scene.add(new THREE.HemisphereLight('#aec6e0', '#5c6b4f', 0.85));
+const sun2 = new THREE.DirectionalLight('#ffe4c4', 0.4);
+sun2.position.set(-50, 30, 40);
+scene.add(sun2);
+scene.add(new THREE.HemisphereLight('#b8d0e4', '#5c6b4f', 0.7));
 
-// ---- Terrain palette ----
-const palette = {
-  grassLow: new THREE.Color('#4f6632'),
-  grassHigh: new THREE.Color('#6e8040'),
-  rock: new THREE.Color('#7a7268'),
-  rockLight: new THREE.Color('#9e9688'),
-  snow: new THREE.Color('#e8ecf2'),
-  water: new THREE.Color('#3b5d72'),
-  dirt: new THREE.Color('#6b604a'),
-};
-
-// ---- Simple value noise ----
+// ============================================================
+// NOISE
+// ============================================================
 function hash(x, z) {
   let n = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453;
   return n - Math.floor(n);
@@ -75,9 +225,7 @@ function lerp(a, b, t) { return a + (b - a) * t; }
 function noise(x, z) {
   const ix = Math.floor(x), iz = Math.floor(z);
   const fx = smooth(x - ix), fz = smooth(z - iz);
-  const a = hash(ix, iz), b = hash(ix + 1, iz);
-  const c = hash(ix, iz + 1), d = hash(ix + 1, iz + 1);
-  return lerp(lerp(a, b, fx), lerp(c, d, fx), fz);
+  return lerp(lerp(hash(ix, iz), hash(ix + 1, iz), fx), lerp(hash(ix, iz + 1), hash(ix + 1, iz + 1), fx), fz);
 }
 function fbm(x, z, octaves = 4) {
   let v = 0, amp = 0.5, freq = 1;
@@ -85,101 +233,155 @@ function fbm(x, z, octaves = 4) {
   return v;
 }
 
-// ---- Terrain geometry builder ----
-const CHUNK = 80;
+function sampleHeight(x, z) {
+  let h = 0;
+  h += fbm(x * 0.010, z * 0.010, 4) * 24;
+  h += fbm(x * 0.040 + 5.3, z * 0.040 + 9.1, 3) * 7;
+  const ridge = 1 - Math.abs(fbm(x * 0.016 + 1.7, z * 0.016 + 3.2, 3) * 2 - 1);
+  h += ridge * 12;
+  return h;
+}
+
+// ============================================================
+// TERRAIN
+// ============================================================
+const CHUNK = 100;
 const SEG = 80;
-const VERT = SEG + 1;
+const TEX_SCALE = 0.18;
+
+const terrainMat = new THREE.MeshStandardMaterial({
+  roughness: 0.82,
+  metalness: 0.02,
+  flatShading: true,
+});
+
+const grassNormalMap = grassNormal;
+const rockNormalMap = rockNormal;
+const grassRoughMap = grassRoughness;
+const rockRoughMap = rockRoughness;
 
 function buildChunkMesh(cx, cz) {
   const geom = new THREE.PlaneGeometry(CHUNK, CHUNK, SEG, SEG);
   geom.rotateX(-Math.PI / 2);
   const pos = geom.attributes.position;
   const colors = new Float32Array(pos.count * 3);
+  const roughness = new Float32Array(pos.count);
+  const texCoord = new Float32Array(pos.count * 2);
 
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i) + cx;
     const z = pos.getZ(i) + cz;
-    let h = 0;
-    // broad shape
-    h += fbm(x * 0.012, z * 0.012, 4) * 22;
-    // detail
-    h += fbm(x * 0.045 + 5.3, z * 0.045 + 9.1, 3) * 6;
-    // ridgelines
-    const ridge = 1 - Math.abs(fbm(x * 0.018 + 1.7, z * 0.018 + 3.2, 3) * 2 - 1);
-    h += ridge * 10;
+    let h = sampleHeight(x, z);
     pos.setY(i, h);
 
-    // color by height + slope
-    const y = h;
-    let col = palette.grassLow.clone();
-    if (y > 14) col = palette.grassHigh.clone().lerp(palette.rockLight, Math.min((y - 14) / 10, 1));
-    if (y > 22) col = palette.rockLight.clone().lerp(palette.rock, Math.min((y - 22) / 8, 1));
-    if (y > 30) col = palette.rock.clone().lerp(palette.snow, Math.min((y - 30) / 8, 1));
-    // micro slope darkening
-    const slope = Math.abs(ridge);
-    col.multiplyScalar(1 - slope * 0.15);
+    const t = (h - 0) / 45;
+    let r = 0.85;
+    let g = new THREE.Color('#4f6632');
+    if (t > 0.35) { g.lerp(new THREE.Color('#6e8040'), (t - 0.35) / 0.2); r = 0.78; }
+    if (t > 0.55) { g.lerp(new THREE.Color('#9e9688'), (t - 0.55) / 0.2); r = 0.55; }
+    if (t > 0.72) { g.lerp(new THREE.Color('#7a7268'), (t - 0.72) / 0.15); r = 0.5; }
+    if (t > 0.88) { g.lerp(new THREE.Color('#e8ecf2'), (t - 0.88) / 0.12); r = 0.65; }
+    colors[i * 3] = g.r;
+    colors[i * 3 + 1] = g.g;
+    colors[i * 3 + 2] = g.b;
+    roughness[i] = r;
 
-    colors[i * 3] = col.r;
-    colors[i * 3 + 1] = col.g;
-    colors[i * 3 + 2] = col.b;
+    texCoord[i * 2] = (x * TEX_SCALE) % 1;
+    texCoord[i * 2 + 1] = (z * TEX_SCALE) % 1;
   }
   geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geom.setAttribute('roughness', new THREE.BufferAttribute(roughness, 1));
+  geom.setAttribute('uv', new THREE.BufferAttribute(texCoord, 2));
   geom.computeVertexNormals();
-  const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
+
+  const mat = terrainMat.clone();
+  mat.vertexColors = true;
   return new THREE.Mesh(geom, mat);
 }
 
-// ---- Water plane ----
-const waterGeom = new THREE.PlaneGeometry(CHUNK * 3, CHUNK * 3);
+// ============================================================
+// WATER
+// ============================================================
+const waterGeom = new THREE.PlaneGeometry(CHUNK * 4, CHUNK * 4);
 waterGeom.rotateX(-Math.PI / 2);
-const waterMat = new THREE.MeshLambertMaterial({ color: palette.water, transparent: true, opacity: 0.78 });
+const waterMat = new THREE.MeshPhysicalMaterial({
+  color: '#3b5d72',
+  roughness: 0.05,
+  metalness: 0.1,
+  transparent: true,
+  opacity: 0.72,
+});
 const water = new THREE.Mesh(waterGeom, waterMat);
-water.position.y = 1.2;
+water.position.y = 2.0;
 scene.add(water);
 
-// ---- Low-poly trees ----
-const trunkGeom = new THREE.CylinderGeometry(0.15, 0.22, 1.4, 5);
-const foliageGeom = new THREE.ConeGeometry(0.9, 2.2, 6, 1);
-const trunkMat = new THREE.MeshLambertMaterial({ color: '#4a3b2f' });
-const foliageMat = new THREE.MeshLambertMaterial({ color: '#2f4025' });
-const foliageAltMat = new THREE.MeshLambertMaterial({ color: '#3a4f30' });
+// ============================================================
+// TREES (Instanced)
+// ============================================================
+const trunkGeom = new THREE.CylinderGeometry(0.18, 0.28, 1.8, 6);
+const foliageGeom = new THREE.ConeGeometry(1.1, 2.8, 7, 1);
+const trunkMat = new THREE.MeshStandardMaterial({ color: '#4a3b2f', roughness: 0.9 });
+const foliageMats = [
+  new THREE.MeshStandardMaterial({ color: '#2f4025', roughness: 0.85 }),
+  new THREE.MeshStandardMaterial({ color: '#3a4f30', roughness: 0.85 }),
+  new THREE.MeshStandardMaterial({ color: '#263820', roughness: 0.88 }),
+];
 
-function treeAt(x, z) {
+const MAX_TREES = 6000;
+const trunkInstanced = new THREE.InstancedMesh(trunkGeom, trunkMat, MAX_TREES);
+const foliageInstanced = new THREE.InstancedMesh(foliageGeom, foliageMats[0], MAX_TREES * 2);
+trunkInstanced.castShadow = false;
+foliageInstanced.castShadow = false;
+scene.add(trunkInstanced);
+scene.add(foliageInstanced);
+
+const dummy = new THREE.Object3D();
+const treeData = [];
+
+function addTree(x, z) {
   const h = sampleHeight(x, z);
-  if (h < 2.8 || h > 26) return null;
-  const group = new THREE.Group();
-  const trunk = new THREE.Mesh(trunkGeom, trunkMat);
-  trunk.position.y = 0.7;
-  group.add(trunk);
-  const f1 = new THREE.Mesh(foliageGeom, Math.random() > 0.5 ? foliageMat : foliageAltMat);
-  f1.position.y = 1.9;
-  group.add(f1);
-  const f2 = new THREE.Mesh(foliageGeom, Math.random() > 0.5 ? foliageMat : foliageAltMat);
-  f2.position.y = 3.0;
-  f2.scale.setScalar(0.75);
-  group.add(f2);
-  group.position.set(x, h, z);
-  const s = 0.75 + Math.random() * 1.1;
-  group.scale.setScalar(s);
-  group.rotation.y = Math.random() * Math.PI * 2;
-  return group;
+  if (h < 3.0 || h > 24) return;
+  const s = 0.7 + Math.random() * 1.3;
+  dummy.position.set(x, h, z);
+  dummy.scale.setScalar(s);
+  dummy.rotation.y = Math.random() * Math.PI * 2;
+  dummy.updateMatrix();
+  treeData.push({ x, z, h, s, rot: dummy.rotation.y });
 }
 
-// ---- Sample height anywhere ----
-function sampleHeight(x, z) {
-  let h = 0;
-  h += fbm(x * 0.012, z * 0.012, 4) * 22;
-  h += fbm(x * 0.045 + 5.3, z * 0.045 + 9.1, 3) * 6;
-  const ridge = 1 - Math.abs(fbm(x * 0.018 + 1.7, z * 0.018 + 3.2, 3) * 2 - 1);
-  h += ridge * 10;
-  return h;
+function buildInstancedTrees() {
+  let trunkIdx = 0, foliageIdx = 0;
+  for (const t of treeData) {
+    if (trunkIdx >= MAX_TREES) break;
+    dummy.position.set(t.x, t.h, t.z);
+    dummy.scale.setScalar(t.s);
+    dummy.rotation.y = t.rot;
+    dummy.updateMatrix();
+    trunkInstanced.setMatrixAt(trunkIdx++, dummy.matrix);
+    dummy.position.set(t.x, t.h + 0.9, t.z);
+    dummy.scale.setScalar(t.s);
+    dummy.rotation.y = t.rot;
+    dummy.updateMatrix();
+    foliageInstanced.setMatrixAt(foliageIdx++, dummy.matrix);
+    dummy.position.set(t.x, t.h + 2.2, t.z);
+    dummy.scale.setScalar(t.s * 0.7);
+    dummy.rotation.y = t.rot + 0.4;
+    dummy.updateMatrix();
+    foliageInstanced.setMatrixAt(foliageIdx++, dummy.matrix);
+  }
+  trunkInstanced.count = trunkIdx;
+  trunkInstanced.instanceMatrix.needsUpdate = true;
+  foliageInstanced.count = foliageIdx;
+  foliageInstanced.instanceMatrix.needsUpdate = true;
+  foliageInstanced.material = foliageMats[Math.floor(Math.random() * foliageMats.length)];
 }
 
-// ---- Chunk pool and recycling ----
+// ============================================================
+// CHUNK MANAGEMENT
+// ============================================================
 const CHUNKS_RADIUS = 2;
 const chunks = new Map();
-const treeGroup = new THREE.Group();
-scene.add(treeGroup);
+const treeChunks = new Map();
 
 function chunkKey(cx, cz) { return `${cx},${cz}`; }
 
@@ -190,15 +392,14 @@ function ensureChunk(cx, cz) {
   scene.add(mesh);
   chunks.set(key, mesh);
 
-  // scatter trees on this chunk
-  const step = 6;
+  // scatter trees
+  const step = 7;
   for (let lx = -CHUNK / 2; lx < CHUNK / 2; lx += step) {
     for (let lz = -CHUNK / 2; lz < CHUNK / 2; lz += step) {
-      if (Math.random() > 0.55) continue;
+      if (Math.random() > 0.6) continue;
       const wx = cx * CHUNK + lx + (Math.random() - 0.5) * step;
       const wz = cz * CHUNK + lz + (Math.random() - 0.5) * step;
-      const t = treeAt(wx, wz);
-      if (t) treeGroup.add(t);
+      addTree(wx, wz);
     }
   }
 }
@@ -208,35 +409,31 @@ function removeChunk(cx, cz) {
   const mesh = chunks.get(key);
   if (!mesh) return;
   scene.remove(mesh);
-  geomDispose(mesh.geometry);
+  mesh.geometry.dispose();
+  mesh.material.dispose();
   chunks.delete(key);
 }
 
-function geomDispose(geom) {
-  if (!geom) return;
-  const attr = geom.attributes;
-  if (attr.color) geom.deleteAttribute('color');
-  geom.dispose();
-}
-
-// preload initial ring
-for (let x = -CHUNKS_RADIUS; x <= CHUNKS_RADIUS; x++) {
+for (let x = -CHUNKS_RADIUS; x <= CHUNKS_RADIUS; x++)
   for (let z = -CHUNKS_RADIUS; z <= CHUNKS_RADIUS; z++) ensureChunk(x, z);
-}
 
-// ---- Walk state ----
+buildInstancedTrees();
+
+// ============================================================
+// STATE
+// ============================================================
 const state = {
-  speed: 4.5, // units/sec
+  speed: 4.2,
   distance: 0,
   yaw: 0,
   pitch: 0.35,
   bob: 0,
+  sway: 0,
 };
 
-// simple drag look
 let dragging = false;
 let prevMouse = { x: 0, y: 0 };
-canvas.addEventListener('pointerdown', (e) => { dragging = true; prevMouse.x = e.clientX; prevMouse.y = e.clientY; });
+canvas.addEventListener('pointerdown', (e) => { dragging = true; prevMouse.x = e.clientX; prevMouse.y = e.clientY; canvas.setPointerCapture(e.pointerId); });
 window.addEventListener('pointerup', () => { dragging = false; });
 window.addEventListener('pointermove', (e) => {
   if (!dragging) return;
@@ -244,63 +441,70 @@ window.addEventListener('pointermove', (e) => {
   const dy = e.clientY - prevMouse.y;
   state.yaw -= dx * 0.004;
   state.pitch -= dy * 0.004;
-  state.pitch = Math.max(-0.4, Math.min(1.1, state.pitch));
+  state.pitch = Math.max(-0.35, Math.min(1.2, state.pitch));
   prevMouse.x = e.clientX;
   prevMouse.y = e.clientY;
 });
 window.addEventListener('wheel', (e) => {
   state.speed *= e.deltaY < 0 ? 1.08 : 0.92;
-  state.speed = Math.max(1.2, Math.min(18, state.speed));
-  paceEl.textContent = (state.speed / 4.5).toFixed(1) + 'x';
+  state.speed = Math.max(1.0, Math.min(20, state.speed));
+  paceEl.textContent = (state.speed / 4.2).toFixed(1) + 'x';
 }, { passive: true });
 
-// ---- Animation loop ----
+// ============================================================
+// ANIMATION
+// ============================================================
 const clock = new THREE.Clock();
+let builtOnce = false;
+
 function tick() {
   const dt = Math.min(clock.getDelta(), 0.1);
   const forward = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(0, state.yaw, 0));
   camera.position.addScaledVector(forward, state.speed * dt);
   state.distance += state.speed * dt;
 
-  // keep camera near terrain
   const ground = sampleHeight(camera.position.x, camera.position.z);
-  const targetY = ground + 2.2;
-  camera.position.y += (targetY - camera.position.y) * Math.min(dt * 3.5, 1);
-  state.bob += dt * state.speed * 1.1;
-  camera.position.y += Math.sin(state.bob) * 0.08;
+  const targetY = ground + 2.6;
+  camera.position.y += (targetY - camera.position.y) * Math.min(dt * 3.2, 1);
+
+  state.bob += dt * state.speed * 1.4;
+  const bobY = Math.sin(state.bob) * 0.18;
+  const swayX = Math.cos(state.bob * 0.7) * 0.06;
+  state.sway += (swayX - state.sway) * Math.min(dt * 8, 1);
+  camera.position.y += bobY;
+  camera.position.x += state.sway;
 
   camera.rotation.order = 'YXZ';
   camera.rotation.y = state.yaw;
   camera.rotation.x = state.pitch;
 
-  // follow water
   water.position.x = camera.position.x;
   water.position.z = camera.position.z;
+  water.material.opacity = 0.68 + Math.sin(clock.elapsedTime * 0.6) * 0.04;
 
-  // recycle chunks
   const cx = Math.round(camera.position.x / CHUNK);
   const cz = Math.round(camera.position.z / CHUNK);
   const desired = new Set();
-  for (let x = cx - CHUNKS_RADIUS; x <= cx + CHUNKS_RADIUS; x++) {
+  for (let x = cx - CHUNKS_RADIUS; x <= cx + CHUNKS_RADIUS; x++)
     for (let z = cz - CHUNKS_RADIUS; z <= cz + CHUNKS_RADIUS; z++) {
       desired.add(chunkKey(x, z));
       ensureChunk(x, z);
     }
-  }
   for (const [key] of chunks) {
-    if (!desired.has(key)) {
-      const [a, b] = key.split(',').map(Number);
-      removeChunk(a, b);
-    }
+    if (!desired.has(key)) removeChunk(...key.split(',').map(Number));
   }
 
-  // HUD
   distEl.textContent = (state.distance / 1000).toFixed(2);
   elevEl.textContent = Math.round(camera.position.y * 10) / 10;
 
   renderer.render(scene, camera);
   requestAnimationFrame(tick);
 }
+
+// ============================================================
+// INIT
+// ============================================================
+loading.classList.add('hidden');
 tick();
 
 window.addEventListener('resize', () => {
