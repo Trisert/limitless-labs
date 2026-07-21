@@ -760,14 +760,25 @@ for (let x = -CHUNKS_RADIUS; x <= CHUNKS_RADIUS; x++) {
     }
   }
 }
-buildInstancedTrees();
-buildGround();
-
 // ============================================================
-// ROAD + CAMERA STATE
+// WALK STATE
 // ============================================================
-initRoad();
-const state = { speed: 4.2, distance: 0, yaw: 0, pitch: 0.42 };
+const state = { speed: 4.2, distance: 0, yaw: 0, pitch: 0.42, bob: 0, sway: 0 };
+// ============================================================
+// STARTUP — defer heavy work to first paint, then start the loop
+// ============================================================
+requestAnimationFrame(() => {
+  try {
+    buildInstancedTrees();
+    buildGround();
+    initRoad();
+  } finally {
+    loading.classList.add('hidden');
+    tick();
+  }
+});
+// safety net: hide loading after 4s even if init stalls
+setTimeout(() => loading.classList.add('hidden'), 4000);
 let dragging = false;
 let prevMouse = { x: 0, y: 0 };
 canvas.addEventListener('pointerdown', (e) => { dragging = true; prevMouse.x = e.clientX; prevMouse.y = e.clientY; canvas.setPointerCapture(e.pointerId); });
@@ -855,9 +866,6 @@ function tick() {
   requestAnimationFrame(tick);
 }
 
-loading.classList.add('hidden');
-tick();
-setTimeout(() => loading.classList.add('hidden'), 4000);
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
