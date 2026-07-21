@@ -24,6 +24,7 @@
   <div class="walk-chip">PACE <span class="accent" id="pace">1.0x</span></div>
   <div class="walk-chip">DIST <span class="accent" id="dist">0.00</span> <span style="opacity:.7">km</span></div>
   <div class="walk-chip">ELEV <span class="accent" id="elev">0</span> <span style="opacity:.7">m</span></div>
+  <div class="walk-chip">BIOME <span class="accent" id="biome">—</span></div>
 </div>
 
 <script type="importmap">
@@ -37,6 +38,7 @@ const loading = document.getElementById('loading');
 const paceEl = document.getElementById('pace');
 const distEl = document.getElementById('dist');
 const elevEl = document.getElementById('elev');
+const biomeEl = document.getElementById('biome');
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
 if (!renderer.capabilities.isWebGL2) {
@@ -46,28 +48,29 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = false;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.35;
+renderer.toneMappingExposure = 1.15;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.onerror = (e) => { console.error('WebGL error:', e); loading.textContent = 'RENDER ERROR — refresh'; };
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.5, 800);
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1.0, 1200);
 camera.position.set(0, 4.2, 0);
 
 // ============================================================
-// SHADER: TERRAIN
+// SKY — atmospheric Rayleigh/Mie approximation
 // ============================================================
-const terrainVertexShader = `
+const sunDir = new THREE.Vector3(200, 120, -90).normalize();
+const skyVertexShader = `
 varying vec3 vWorldPos;
-varying vec3 vNormal;
-varying float vHeight;
-varying vec2 vUv;
-varying float vRoughness;
-varying float vSlope;
-
+void main() {
+  vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+const skyFragmentShader = `
+varying vec3 vWorldPos;
+uniform vec3 uSunDir;
 uniform float uTime;
-
-// value noise
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float noise(vec2 p) {
   vec2 i = floor(p); vec2 f = fract(p); f = f*f*(3.0-2.0*f);
@@ -75,10 +78,310 @@ float noise(vec2 p) {
 }
 float fbm(vec2 p) {
   float v = 0.0, a = 0.5;
-  for (int i = 0; i < 5; i++) { v += a * noise(p); p *= 2.1; a *= 0.5; }
+  for (int i = 0; i < 6; i++) { v += a * noise(p); p *= 2.05; a *= 0.48; }
   return v;
 }
+void main() {
+  vec3 dir = normalize(vWorldPos);
+  float y = dir.y * 0.5 + 0.5;
 
+  // sun disk + low-atmosphere haze
+  float sun = max(dot(dir, normalize(uSunDir)), 0.0);
+  vec3 haze = vec3(0.72, 0.76, 0.82);
+  vec3 horizon = mix(vec3(0.72, 0.76, 0.83), vec3(0.88, 0.84, 0.78), pow(sun, 4.0));
+  vec3 zenith = vec3(0.18, 0.34, 0.62);
+  vec3 nadir = vec3(0.52, 0.48, 0.44);
+  vec3 col = mix(nadir, mix(horizon, zenith, pow(y, 0.55)), step(0.0, dir.y));
+
+  // soft sky blob near horizon + sun
+  col += vec3(0.95, 0.88, 0.72) * pow(sun, 8.0) * 0.18;
+  col += vec3(1.0, 0.96, 0.82) * pow(sun, 32.0) * 0.45;
+  col += vec3(1.0, 0.94, 0.78) * pow(sun, 160.0) * 0.9;
+
+  // haze under sun
+  float hDir = max(dot(normalize(vec3(dir.x, 0.0, dir.z)), normalize(vec3(uSunDir.x, 0.0, uSunDir.z))), 0.0);
+  col = mix(col, haze, pow(hDir, 6.0) * 0.35 * smoothstep(0.35, 0.75, y));
+
+  // clouds layers
+  vec3 sunH = normalize(vec3(uSunDir.x, max(uSunDir.y, 0.05), uSunDir.z));
+  float cloudA = fbm(dir.xz / (dir.y + 0.45) * 1.35 + uTime * 0.004);
+  cloudA = smoothstep(0.48, 0.72, cloudA);
+  float cloudB = fbm(dir.xz / (dir.y + 0.35) * 1.8 - uTime * 0.003 + 3.7);
+  cloudB = smoothstep(0.52, 0.78, cloudB);
+  float cloudMask = (cloudA * 0.7 + cloudB * 0.3);
+  // backscatter around sun
+  float sunBack = pow(max(dot(dir, sunH), 0.0), 2.0);
+  cloudMask += sunBack * 0.2;
+  vec3 cloudCol = mix(haze, vec3(1.0, 0.95, 0.9), pow(sunBack, 2.0));
+  col = mix(col, cloudCol, cloudMask * 0.85);
+
+  // darker at very low angles for depth
+  col *= 1.0 - (1.0 - y) * 0.45;
+
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
+// ============================================================
+// ROAD SYSTEM — spline-based procedural road
+// ============================================================
+const ROAD_SPLINE_POINTS = 220;
+const ROAD_SPLINE_STEP = 80;
+const ROAD_WIDTH = 6.5;
+const ROAD_SEGMENTS = 48;
+const ROAD_VERTEX_COUNT = ROAD_SPLINE_POINTS * ROAD_SEGMENTS * 4;
+
+function generateRoadSpline() {
+  const points = []; const tangents = []; const upVectors = [];
+  let pos = new THREE.Vector3(0, 0, 0);
+  let forward = new THREE.Vector3(0, 0, -1);
+  let up = new THREE.Vector3(0, 1, 0);
+  let right = new THREE.Vector3(1, 0, 0);
+
+  function roadNoise(x, z, scale) {
+    let v = 0, a = 1;
+    const p = new THREE.Vector2(x ?? 0, z ?? 0).multiplyScalar(scale);
+    for (let i = 0; i < 5; i++) {
+      const np = p.clone().multiplyScalar(a);
+      const h = Math.sin(np.x * 12.9898 + np.y * 78.233) * 43758.5453;
+      v += a * (h - Math.floor(h));
+      a *= 0.5;
+    }
+    return v;
+  }
+
+  for (let i = 0; i < ROAD_SPLINE_POINTS; i++) {
+    const baseDist = i * ROAD_SPLINE_STEP;
+    const curveAmount = roadNoise(baseDist * 0.001, 0, 1.0) * 2.0 - 1.0;
+    const curvature = curveAmount * 0.00065;
+    const bankAngle = curvature * 140.0;
+    const elevationNoise = roadNoise(baseDist * 0.0005, 1000, 1.0);
+    const elevation = elevationNoise * 22.0;
+
+    const turnQuat = new THREE.Quaternion().setFromAxisAngle(up, curvature * ROAD_SPLINE_STEP);
+    forward.applyQuaternion(turnQuat).normalize();
+    right.crossVectors(up, forward).normalize();
+    const bankQuat = new THREE.Quaternion().setFromAxisAngle(forward, bankAngle);
+    const tiltedUp = up.clone().applyQuaternion(bankQuat).normalize();
+    pos.addScaledVector(forward, ROAD_SPLINE_STEP);
+    pos.y = elevation;
+
+    points.push(pos.clone());
+    tangents.push(forward.clone());
+    upVectors.push(tiltedUp.clone());
+  }
+  return { points, tangents, upVectors };
+}
+
+function buildRoadMesh(spline) {
+  const positions = new Float32Array(ROAD_VERTEX_COUNT * 3);
+  const uvs = new Float32Array(ROAD_VERTEX_COUNT * 2);
+  const normals = new Float32Array(ROAD_VERTEX_COUNT * 3);
+  const roadIds = new Float32Array(ROAD_VERTEX_COUNT);
+  let idx = 0;
+
+  for (let seg = 0; seg < ROAD_SPLINE_POINTS - 1; seg++) {
+    const p0 = spline.points[seg]; const p1 = spline.points[seg + 1];
+    const t0 = spline.tangents[seg]; const t1 = spline.tangents[seg + 1];
+    const u0 = spline.upVectors[seg]; const u1 = spline.upVectors[seg + 1];
+    const r0 = new THREE.Vector3().crossVectors(u0, t0).normalize();
+    const r1 = new THREE.Vector3().crossVectors(u1, t1).normalize();
+
+    for (let s = 0; s <= ROAD_SEGMENTS; s++) {
+      const u = s / ROAD_SEGMENTS; const invU = 1 - u;
+      const pos = new THREE.Vector3().copy(p0).multiplyScalar(invU).addScaledVector(p1, u);
+      const tangent = new THREE.Vector3().copy(t0).multiplyScalar(invU).addScaledVector(t1, u).normalize();
+      const up = new THREE.Vector3().copy(u0).multiplyScalar(invU).addScaledVector(u1, u).normalize();
+      const right = new THREE.Vector3().crossVectors(up, tangent).normalize();
+
+      const crown = (r) => r === 1 ? 0.04 * (1 - Math.abs((r - 0.5) * 2)) : 0;
+      const profile = [
+        { offset: -ROAD_WIDTH * 0.72, id: 0 },
+        { offset: -ROAD_WIDTH * 0.38, id: 1 },
+        { offset:  ROAD_WIDTH * 0.38, id: 1 },
+        { offset:  ROAD_WIDTH * 0.72, id: 0 }
+      ];
+      for (let pi = 0; pi < profile.length; pi++) {
+        const prof = profile[pi];
+        const vertex = pos.clone().addScaledVector(right, prof.offset);
+        vertex.y += crown(prof.id);
+
+        positions[idx * 3] = vertex.x;
+        positions[idx * 3 + 1] = vertex.y;
+        positions[idx * 3 + 2] = vertex.z;
+        uvs[idx * 2] = seg + u;
+        uvs[idx * 2 + 1] = pi / (profile.length - 1);
+        roadIds[idx] = prof.id;
+        const nrm = up;
+        normals[idx * 3] = nrm.x; normals[idx * 3 + 1] = nrm.y; normals[idx * 3 + 2] = nrm.z;
+        idx++;
+      }
+    }
+  }
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geom.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+  geom.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+  geom.setAttribute('roadId', new THREE.BufferAttribute(roadIds, 1));
+  geom.computeBoundingSphere();
+  return geom;
+}
+
+const roadVertexShader = `
+varying vec2 vUv;
+varying vec3 vWorldPos;
+varying vec3 vNormal;
+varying float vRoadId;
+void main() {
+  vUv = uv;
+  vRoadId = roadId;
+  vNormal = normalize(normalMatrix * normal);
+  vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+const roadFragmentShader = `
+varying vec2 vUv;
+varying vec3 vWorldPos;
+varying vec3 vNormal;
+varying float vRoadId;
+uniform vec3 uSunDir;
+uniform float uTime;
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise(vec2 p) {
+  vec2 i = floor(p); vec2 f = fract(p); f = f*f*(3.0-2.0*f);
+  return mix(mix(hash(i), hash(i+vec2(1,0)), f.x), mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), f.x), f.y);
+}
+float fbm(vec2 p) {
+  float v = 0.0, a = 0.5;
+  for (int i = 0; i < 4; i++) { v += a * noise(p); p *= 2.15; a *= 0.5; }
+  return v;
+}
+void main() {
+  float alongRoad = vUv.x;
+  float acrossRoad = vUv.y;
+  vec3 asphalt = vec3(0.12, 0.11, 0.10);
+  vec3 shoulder = vec3(0.22, 0.20, 0.17);
+  vec3 lineWhite = vec3(0.94, 0.94, 0.90);
+  vec3 lineYellow = vec3(1.0, 0.85, 0.15);
+  vec3 col = shoulder;
+  if (vRoadId > 0.5 && vRoadId < 1.5) {
+    float n = fbm(vWorldPos.xz * 0.35) * 0.18;
+    col = asphalt * (0.9 + n);
+    float centerDist = abs(acrossRoad - 0.5);
+    float dash = fract(alongRoad * 0.9 + uTime * 0.02);
+    if (centerDist < 0.018 && dash < 0.55) { col = mix(col, lineYellow, 0.95); }
+    float edgeDist = min(abs(acrossRoad - 0.28), abs(acrossRoad - 0.72));
+    if (edgeDist < 0.014) { col = mix(col, lineWhite, 0.85); }
+    float wear = smoothstep(0.36, 0.45, acrossRoad) * smoothstep(0.55, 0.64, acrossRoad);
+    col *= 1.0 - wear * 0.18;
+  } else {
+    float n = fbm(vWorldPos.xz * 0.14 + uTime * 0.01) * 0.3;
+    col = shoulder * (0.82 + n);
+    float edgeLine = smoothstep(0.88, 0.92, acrossRoad) + smoothstep(0.12, 0.08, acrossRoad);
+    col = mix(col, lineWhite * 0.7, edgeLine * 0.35);
+  }
+  vec3 N = normalize(vNormal);
+  float NdotL = max(dot(N, normalize(uSunDir)), 0.0);
+  float wrap = max(dot(N, normalize(uSunDir + vec3(0.0, 0.3, 0.0))), 0.0);
+  vec3 ambient = vec3(0.22, 0.25, 0.30);
+  vec3 diffuse = vec3(1.0, 0.98, 0.90) * (wrap * 0.65 + 0.35);
+  col *= ambient + diffuse * NdotL * 0.85;
+  float fresnel = pow(1.0 - max(dot(N, normalize(-vWorldPos)), 0.0), 3.0);
+  col += vec3(0.08, 0.10, 0.13) * fresnel * 0.35;
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
+let roadSpline = null;
+let roadMesh = null;
+const roadSplineObjects = [];
+
+function initRoad() {
+  roadSpline = generateRoadSpline();
+  const geom = buildRoadMesh(roadSpline);
+  const roadMaterial = new THREE.ShaderMaterial({
+    vertexShader: roadVertexShader,
+    fragmentShader: roadFragmentShader,
+    uniforms: {
+      uSunDir: { value: sunDir.clone() },
+      uTime: { value: 0 }
+    }
+  });
+  roadMesh = new THREE.Mesh(geom, roadMaterial);
+  roadMesh.frustumCulled = false;
+  scene.add(roadMesh);
+
+  // Guardrail posts along road edges
+  const railGeo = new THREE.CylinderGeometry(0.06, 0.08, 1.1, 5);
+  const railMat = new THREE.MeshStandardMaterial({ color: '#3a3a3a', roughness: 0.7, metalness: 0.4 });
+  const railMax = 6000;
+  const railInst = new THREE.InstancedMesh(railGeo, railMat, railMax);
+  const dm = new THREE.Object3D();
+  let ri = 0;
+  for (let seg = 0; seg < ROAD_SPLINE_POINTS - 1 && ri < railMax; seg += 2) {
+    const p = roadSpline.points[seg];
+    const n = roadSpline.tangents[seg];
+    const u = roadSpline.upVectors[seg];
+    const r = new THREE.Vector3().crossVectors(u, n).normalize();
+    [r.clone().multiplyScalar(-ROAD_WIDTH * 0.72), r.clone().multiplyScalar(ROAD_WIDTH * 0.72)].forEach((side) => {
+      if (ri >= railMax) return;
+      dm.position.copy(p).add(side);
+      dm.rotation.y = Math.atan2(n.x, n.z);
+      dm.updateMatrix();
+      railInst.setMatrixAt(ri++, dm.matrix);
+    });
+  }
+  railInst.count = ri;
+  railInst.instanceMatrix.needsUpdate = true;
+  scene.add(railInst);
+  roadSplineObjects.push(railInst);
+}
+
+function getRoadInfoAt(worldX, worldZ) {
+  if (!roadSpline) return null;
+  let bestIdx = 0;
+  let bestDist = Infinity;
+  for (let i = 0; i < roadSpline.points.length; i++) {
+    const p = roadSpline.points[i];
+    const d = (p.x - worldX) ** 2 + (p.z - worldZ) ** 2;
+    if (d < bestDist) { bestDist = d; bestIdx = i; }
+  }
+  const i0 = bestIdx;
+  const i1 = Math.min(i0 + 1, roadSpline.points.length - 1);
+  const p0 = roadSpline.points[i0]; const p1 = roadSpline.points[i1];
+  const t0 = roadSpline.tangents[i0]; const t1 = roadSpline.tangents[i1];
+  const u0 = roadSpline.upVectors[i0]; const u1 = roadSpline.upVectors[i1];
+  const localDist = Math.sqrt(bestDist);
+  const u = Math.min(localDist / Math.max(ROAD_SPLINE_STEP, 1e-6), 1.0);
+  const invU = 1 - u;
+  const pos = new THREE.Vector3().copy(p0).multiplyScalar(invU).addScaledVector(p1, u);
+  const tangent = new THREE.Vector3().copy(t0).multiplyScalar(invU).addScaledVector(t1, u).normalize();
+  const up = new THREE.Vector3().copy(u0).multiplyScalar(invU).addScaledVector(u1, u).normalize();
+  const right = new THREE.Vector3().crossVectors(up, tangent).normalize();
+  return { pos, tangent, up, right, index: bestIdx + u, dist: Math.sqrt(bestDist) };
+}
+
+// ============================================================
+// TERRAIN
+// ============================================================
+const terrainVertexShader = `
+varying vec3 vWorldPos;
+varying vec3 vNormal;
+varying float vHeight;
+varying vec2 vUv;
+varying float vSlope;
+uniform float uTime;
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise(vec2 p) {
+  vec2 i = floor(p); vec2 f = fract(p); f = f*f*(3.0-2.0*f);
+  return mix(mix(hash(i), hash(i+vec2(1,0)), f.x), mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), f.x), f.y);
+}
+float fbm(vec2 p) {
+  float v = 0.0, a = 0.5;
+  for (int i = 0; i < 6; i++) { v += a * noise(p); p *= 2.08; a *= 0.48; }
+  return v;
+}
 float getHeight(vec2 p) {
   float h = 0.0;
   h += fbm(p * 0.007) * 30.0;
@@ -89,7 +392,6 @@ float getHeight(vec2 p) {
   h -= pow(valley, 4.0) * 18.0;
   return h;
 }
-
 void main() {
   vUv = uv;
   vec3 pos = position;
@@ -97,8 +399,6 @@ void main() {
   pos.y += h;
   vHeight = h;
   vWorldPos = (modelMatrix * vec4(pos, 1.0)).xyz;
-
-  // compute normal from heightfield
   float eps = 0.5;
   float hL = getHeight(pos.xz + vec2(-eps, 0.0));
   float hR = getHeight(pos.xz + vec2( eps, 0.0));
@@ -107,30 +407,23 @@ void main() {
   vec3 normal = normalize(vec3(hL - hR, 2.0 * eps, hD - hU));
   vNormal = normalize(normalMatrix * normal);
   vSlope = 1.0 - abs(normal.y);
-
-  // micro displacement for granularity
   pos.y += fbm(pos.xz * 0.12) * 0.35;
   pos.y += noise(pos.xz * 0.6) * 0.08;
-
   gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
 }
 `;
-
 const terrainFragmentShader = `
 varying vec3 vWorldPos;
 varying vec3 vNormal;
 varying float vHeight;
 varying vec2 vUv;
-varying float vRoughness;
 varying float vSlope;
-
 uniform sampler2D uGrassTex;
 uniform sampler2D uRockTex;
 uniform sampler2D uDirtTex;
 uniform sampler2D uSnowTex;
 uniform vec3 uSunDir;
 uniform float uTime;
-
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float noise(vec2 p) {
   vec2 i = floor(p); vec2 f = fract(p); f = f*f*(3.0-2.0*f);
@@ -138,62 +431,68 @@ float noise(vec2 p) {
 }
 float fbm(vec2 p) {
   float v = 0.0, a = 0.5;
-  for (int i = 0; i < 4; i++) { v += a * noise(p); p *= 2.2; a *= 0.5; }
+  for (int i = 0; i < 4; i++) { v += a * noise(p); p *= 2.15; a *= 0.5; }
   return v;
 }
-
+float vegetationNoise(vec2 p) {
+  return fbm(p * 0.025) * 0.5 + fbm(p * 0.1) * 0.3 + fbm(p * 0.4) * 0.2;
+}
 void main() {
   vec3 N = normalize(vNormal);
   float h = vHeight;
   float t = clamp((h - 1.0) / 48.0, 0.0, 1.0);
-
-  // biome blend
-  float grassW = 1.0 - smoothstep(0.22, 0.55, t);
-  float dirtW = smoothstep(0.28, 0.55, t) * (1.0 - smoothstep(0.55, 0.75, t));
-  float rockW = smoothstep(0.48, 0.72, t) * (1.0 - smoothstep(0.72, 0.9, t));
-  float snowW = smoothstep(0.78, 1.0, t);
-
-  // slope influence: more rock/dirt on steep slopes
+  float grassW = 1.0 - smoothstep(0.20, 0.55, t);
+  float dirtW = smoothstep(0.28, 0.55, t) * (1.0 - smoothstep(0.55, 0.72, t));
+  float rockW = smoothstep(0.48, 0.72, t) * (1.0 - smoothstep(0.72, 0.88, t));
+  float snowW = smoothstep(0.80, 0.98, t);
   float slope = vSlope;
-  rockW += slope * 0.6;
-  dirtW += slope * 0.3;
-  grassW = max(0.0, grassW - slope * 0.7);
+  rockW += slope * 0.55; dirtW += slope * 0.25; grassW = max(0.0, grassW - slope * 0.7);
 
-  // tiling sample with granular detail
-  vec2 uv1 = vWorldPos.xz * 0.12;
-  vec2 uv2 = vWorldPos.xz * 0.06;
-  float detail = fbm(uv2 * 3.0 + uTime * 0.02) * 0.5;
-
+  vec2 uv1 = vWorldPos.xz * 0.12; vec2 uv2 = vWorldPos.xz * 0.06;
+  float detail = fbm(uv2 * 3.0 + uTime * 0.008) * 0.5;
   vec3 grass = texture2D(uGrassTex, uv1 + detail * 0.05).rgb;
   vec3 dirt  = texture2D(uDirtTex, uv1 * 1.1 + detail * 0.04).rgb;
   vec3 rock  = texture2D(uRockTex, uv1 * 0.9 + detail * 0.06).rgb;
   vec3 snow  = texture2D(uSnowTex, uv1 * 1.2 + detail * 0.03).rgb;
-
   vec3 col = grass * grassW + dirt * dirtW + rock * rockW + snow * snowW;
 
-  // slope darkening / AO approximation
-  col *= 1.0 - slope * 0.35;
+  // road-edge rut/disturbance
+  if (roadSpline) {
+    const info = getRoadInfoAt(vWorldPos.x, vWorldPos.z);
+    if (info) {
+      float roadDist = abs(info.dist);
+      float edgeInfluence = smoothstep(ROAD_WIDTH * 1.1, ROAD_WIDTH * 0.5, roadDist);
+      col = mix(col, dirt * 1.05, edgeInfluence * 0.35);
+      col += vec3(0.02, 0.01, 0.0) * edgeInfluence * 0.2;
+    }
+  }
 
-  // micro shadow from noise
-  float shadow = fbm(vWorldPos.xz * 0.25) * 0.15;
+  // vegetation "green boost" from procedural mask
+  float veg = vegetationNoise(vWorldPos.xz);
+  float grassPatch = smoothstep(0.38, 0.55, veg);
+  col = mix(col, grass * 1.08, grassPatch * grassW * 0.45);
+
+  col *= 1.0 - slope * 0.28;
+  float shadow = fbm(vWorldPos.xz * 0.22) * 0.12;
   col *= 1.0 - shadow;
 
-  // lighting
+  // distance fog/atmospheric perspective (matches sky horizon color)
+  float dist = length(vWorldPos - cameraPosition);
+  float fog = 1.0 - exp(-dist * 0.00025);
+  vec3 fogCol = mix(vec3(0.72, 0.76, 0.82), vec3(0.92, 0.88, 0.82), pow(max(dot(normalize(vWorldPos - cameraPosition), normalize(uSunDir)), 0.0), 2.5));
+  col = mix(col, fogCol, fog * 0.65);
+
   float NdotL = max(dot(N, normalize(uSunDir)), 0.0);
   float wrap = max(dot(N, normalize(uSunDir + vec3(0.0, 0.3, 0.0))), 0.0);
   vec3 ambient = vec3(0.18, 0.22, 0.28);
-  vec3 diffuse = vec3(1.0, 0.95, 0.85) * (wrap * 0.7 + 0.3);
+  vec3 diffuse = vec3(1.0, 0.98, 0.88) * (wrap * 0.75 + 0.25);
   col *= ambient + diffuse * NdotL;
-
-  // roughness from slope
-  float rough = 0.75 + slope * 0.2;
-
   gl_FragColor = vec4(col, 1.0);
 }
 `;
 
 // ============================================================
-// SHADER: WATER
+// WATER
 // ============================================================
 const waterVertexShader = `
 varying vec2 vUv;
@@ -202,8 +501,8 @@ uniform float uTime;
 void main() {
   vUv = uv;
   vec3 pos = position;
-  pos.y += sin(pos.x * 0.3 + uTime * 0.6) * 0.15;
-  pos.y += cos(pos.z * 0.25 + uTime * 0.5) * 0.15;
+  pos.y += sin(pos.x * 0.3 + uTime * 0.55) * 0.14;
+  pos.y += cos(pos.z * 0.24 + uTime * 0.45) * 0.14;
   vWorldPos = (modelMatrix * vec4(pos, 1.0)).xyz;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
 }
@@ -219,66 +518,20 @@ float noise(vec2 p) {
   return mix(mix(hash(i), hash(i+vec2(1,0)), f.x), mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), f.x), f.y);
 }
 void main() {
-  vec3 deep = vec3(0.12, 0.25, 0.35);
-  vec3 shallow = vec3(0.25, 0.45, 0.55);
-  float n = noise(vWorldPos.xz * 0.08 + uTime * 0.15) * 0.5 + 0.5;
+  vec3 deep = vec3(0.10, 0.22, 0.33);
+  vec3 shallow = vec3(0.22, 0.42, 0.54);
+  float n = noise(vWorldPos.xz * 0.072 + uTime * 0.12) * 0.5 + 0.5;
   vec3 col = mix(deep, shallow, n);
   float fresnel = pow(1.0 - abs(dot(vec3(0.0, 1.0, 0.0), normalize(vec3(0.0, 1.0, 0.0)))), 2.0);
-  col += vec3(0.6, 0.7, 0.8) * fresnel * 0.25;
-  gl_FragColor = vec4(col, 0.78);
+  float spec = pow(max(dot(normalize(vec3(0.0, 1.0, 0.0)), normalize(uSunDir)), 0.0), 48.0);
+  col += vec3(0.6, 0.7, 0.8) * fresnel * 0.28;
+  col += vec3(1.0, 1.0, 1.0) * spec * 0.25;
+  gl_FragColor = vec4(col, 0.76);
 }
 `;
 
 // ============================================================
-// SHADER: SKY
-// ============================================================
-const skyVertexShader = `
-varying vec3 vWorldPos;
-void main() {
-  vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-}
-`;
-const skyFragmentShader = `
-varying vec3 vWorldPos;
-uniform vec3 uSunDir;
-float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-float noise(vec2 p) {
-  vec2 i = floor(p); vec2 f = fract(p); f = f*f*(3.0-2.0*f);
-  return mix(mix(hash(i), hash(i+vec2(1,0)), f.x), mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), f.x), f.y);
-}
-float fbm(vec2 p) {
-  float v = 0.0, a = 0.5;
-  for (int i = 0; i < 4; i++) { v += a * noise(p); p *= 2.1; a *= 0.5; }
-  return v;
-}
-void main() {
-  vec3 dir = normalize(vWorldPos);
-  float y = dir.y * 0.5 + 0.5;
-  vec3 horizon = vec3(0.7, 0.75, 0.8);
-  vec3 zenith = vec3(0.2, 0.35, 0.55);
-  vec3 nadir = vec3(0.55, 0.5, 0.45);
-  vec3 col = mix(nadir, mix(horizon, zenith, pow(y, 0.8)), step(0.0, dir.y));
-
-  // sun glow
-  float sun = max(dot(dir, normalize(uSunDir)), 0.0);
-  col += vec3(1.0, 0.9, 0.7) * pow(sun, 64.0) * 0.8;
-  col += vec3(1.0, 0.85, 0.7) * pow(sun, 8.0) * 0.2;
-
-  // clouds
-  float cloud = fbm(dir.xz / (dir.y + 0.3) * 1.5);
-  cloud = smoothstep(0.45, 0.75, cloud);
-  col = mix(col, vec3(0.95, 0.95, 0.98), cloud * 0.6);
-
-  gl_FragColor = vec4(col, 1.0);
-}
-`;
-
-// ============================================================
-// MATERIALS
-// ============================================================
-// ============================================================
-// TEXTURES — procedural, no external assets
+// TEXTURES — procedural
 // ============================================================
 function makeTexture(size, fn) {
   const c = document.createElement('canvas');
@@ -318,50 +571,37 @@ const snowTex = makeTexture(128, (u, v) => {
   return [n*255, n*252, n*255, 255];
 });
 
-const sunDir = new THREE.Vector3(200, 140, -90).normalize();
-
 const terrainMaterial = new THREE.ShaderMaterial({
   vertexShader: terrainVertexShader,
   fragmentShader: terrainFragmentShader,
   uniforms: {
     uTime: { value: 0 },
-    uSunDir: { value: sunDir },
+    uSunDir: { value: sunDir.clone() },
     uGrassTex: { value: grassTex },
     uDirtTex: { value: dirtTex },
     uRockTex: { value: rockTex },
     uSnowTex: { value: snowTex },
   },
 });
-
 const waterMaterial = new THREE.ShaderMaterial({
   vertexShader: waterVertexShader,
   fragmentShader: waterFragmentShader,
-  uniforms: {
-    uTime: { value: 0 },
-    uSunDir: { value: sunDir },
-  },
+  uniforms: { uTime: { value: 0 }, uSunDir: { value: sunDir.clone() } },
   transparent: true,
 });
-
 const skyMaterial = new THREE.ShaderMaterial({
   vertexShader: skyVertexShader,
   fragmentShader: skyFragmentShader,
-  uniforms: {
-    uSunDir: { value: sunDir },
-  },
+  uniforms: { uSunDir: { value: sunDir.clone() }, uTime: { value: 0 } },
   side: THREE.BackSide,
 });
 
-// ============================================================
-// SCENE OBJECTS
-// ============================================================
-const skyGeo = new THREE.SphereGeometry(400, 32, 32);
+const skyGeo = new THREE.SphereGeometry(450, 32, 32);
 const skyMesh = new THREE.Mesh(skyGeo, skyMaterial);
 scene.add(skyMesh);
 
-const CHUNK = 96;
-const SEG = 64;
-const chunks = new Map();
+// terrain chunks
+const CHUNK = 96; const SEG = 64; const chunks = new Map();
 function chunkKey(cx, cz) { return `${cx},${cz}`; }
 function ensureChunk(cx, cz) {
   const key = chunkKey(cx, cz);
@@ -404,7 +644,6 @@ const foliageMats = [
   new THREE.MeshStandardMaterial({ color: '#263820', roughness: 0.9 }),
   new THREE.MeshStandardMaterial({ color: '#4a5a3a', roughness: 0.84 }),
 ];
-
 const MAX_TREES = 6000;
 const trunkInstanced = new THREE.InstancedMesh(trunkGeom, trunkMat, MAX_TREES);
 const foliageInstanced = new THREE.InstancedMesh(foliageGeom, foliageMats[0], MAX_TREES * 2);
@@ -412,7 +651,6 @@ trunkInstanced.castShadow = false;
 foliageInstanced.castShadow = false;
 scene.add(trunkInstanced);
 scene.add(foliageInstanced);
-
 const dummy = new THREE.Object3D();
 const treeData = [];
 function sampleHeightJS(x, z) {
@@ -473,12 +711,10 @@ const rockGeom = new THREE.DodecahedronGeometry(0.45, 0);
 const rockMat = new THREE.MeshStandardMaterial({ color: '#6e685f', roughness: 0.7, flatShading: true });
 const rockInstanced = new THREE.InstancedMesh(rockGeom, rockMat, 4000);
 scene.add(rockInstanced);
-
 const bushGeom = new THREE.SphereGeometry(0.55, 5, 4);
 const bushMat = new THREE.MeshStandardMaterial({ color: '#3a4f30', roughness: 0.9, flatShading: true });
 const bushInstanced = new THREE.InstancedMesh(bushGeom, bushMat, 3000);
 scene.add(bushInstanced);
-
 const groundData = [];
 function addGround(x, z) {
   const h = sampleHeightJS(x, z);
@@ -496,8 +732,8 @@ function buildGround() {
     dm.scale.setScalar(g.s);
     dm.rotation.set(g.rock ? 0 : 1.3, g.rot, g.rock ? g.rot : 0);
     dm.updateMatrix();
-    if (g.rock && ri < 8000) rockInstanced.setMatrixAt(ri++, dm.matrix);
-    else if (!g.rock && bi < 6000) bushInstanced.setMatrixAt(bi++, dm.matrix);
+    if (g.rock && ri < 4000) rockInstanced.setMatrixAt(ri++, dm.matrix);
+    else if (!g.rock && bi < 3000) bushInstanced.setMatrixAt(bi++, dm.matrix);
   }
   rockInstanced.count = ri;
   rockInstanced.instanceMatrix.needsUpdate = true;
@@ -505,7 +741,6 @@ function buildGround() {
   bushInstanced.instanceMatrix.needsUpdate = true;
 }
 
-// populate chunks
 const step = 5.5;
 for (let x = -CHUNKS_RADIUS; x <= CHUNKS_RADIUS; x++) {
   for (let z = -CHUNKS_RADIUS; z <= CHUNKS_RADIUS; z++) {
@@ -524,9 +759,10 @@ buildInstancedTrees();
 buildGround();
 
 // ============================================================
-// WALK STATE
+// ROAD + CAMERA STATE
 // ============================================================
-const state = { speed: 4.2, distance: 0, yaw: 0, pitch: 0.42, bob: 0, sway: 0 };
+initRoad();
+const state = { speed: 4.2, distance: 0, yaw: 0, pitch: 0.42 };
 let dragging = false;
 let prevMouse = { x: 0, y: 0 };
 canvas.addEventListener('pointerdown', (e) => { dragging = true; prevMouse.x = e.clientX; prevMouse.y = e.clientY; canvas.setPointerCapture(e.pointerId); });
@@ -535,7 +771,7 @@ window.addEventListener('pointermove', (e) => {
   if (!dragging) return;
   state.yaw -= (e.clientX - prevMouse.x) * 0.004;
   state.pitch -= (e.clientY - prevMouse.y) * 0.004;
-  state.pitch = Math.max(-0.35, Math.min(1.35, state.pitch));
+  state.pitch = Math.max(-0.25, Math.min(1.25, state.pitch));
   prevMouse.x = e.clientX; prevMouse.y = e.clientY;
 });
 window.addEventListener('wheel', (e) => {
@@ -544,25 +780,32 @@ window.addEventListener('wheel', (e) => {
   paceEl.textContent = (state.speed / 4.2).toFixed(1) + 'x';
 }, { passive: true });
 
+// biome label
+const BIOME_NAMES = ['river valley','lowland meadow','mixed forest','high grass','rocky ridge','alpine snow'];
+function classifyBiome(h, slope) {
+  if (h > 38 && slope < 0.25) return 'alpine snow';
+  if (h > 32) return 'rocky ridge';
+  if (h > 24 && slope < 0.35) return 'high grass';
+  if (slope > 0.6) return 'rocky ridge';
+  if (h < 8.5) return 'river valley';
+  return 'mixed forest';
+}
+
 // ============================================================
 // LOOP
 // ============================================================
 const clock = new THREE.Clock();
 function tick() {
   const dt = Math.min(clock.getDelta(), 0.1);
-  const forward = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(0, state.yaw, 0));
-  camera.position.addScaledVector(forward, state.speed * dt);
+  const time = clock.elapsedTime;
+  const fwd = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(0, state.yaw, 0));
+  camera.position.addScaledVector(fwd, state.speed * dt);
   state.distance += state.speed * dt;
 
   const ground = sampleHeightJS(camera.position.x, camera.position.z);
   const targetY = ground + 3.3;
   camera.position.y += (targetY - camera.position.y) * Math.min(dt * 4.0, 1);
-  state.bob += dt * state.speed * 1.6;
-  const bobY = Math.sin(state.bob) * 0.26;
-  const swayX = Math.cos(state.bob * 0.55) * 0.1;
-  state.sway += (swayX - state.sway) * Math.min(dt * 8, 1);
-  camera.position.y += bobY;
-  camera.position.x += state.sway;
+  state.yaw += Math.sin(time * 0.25) * dt * 0.03;
 
   camera.rotation.order = 'YXZ';
   camera.rotation.y = state.yaw;
@@ -570,6 +813,7 @@ function tick() {
 
   water.position.x = camera.position.x;
   water.position.z = camera.position.z;
+  skyMesh.position.copy(camera.position);
 
   const cx = Math.round(camera.position.x / CHUNK);
   const cz = Math.round(camera.position.z / CHUNK);
@@ -581,11 +825,26 @@ function tick() {
     }
   for (const [key] of chunks) if (!desired.has(key)) removeChunk(...key.split(',').map(Number));
 
-  distEl.textContent = (state.distance / 1000).toFixed(2);
-  elevEl.textContent = Math.round(camera.position.y * 10) / 10;
+  const info = getRoadInfoAt(camera.position.x, camera.position.z);
+  if (info) {
+    const lateral = new THREE.Vector3().crossVectors(fwd, info.tangent).dot(new THREE.Vector3().crossVectors(fwd, info.right));
+    const softness = Math.max(0, 1 - Math.abs(info.dist) / (ROAD_WIDTH * 2.2));
+    const steer = Math.sin(time * 0.35) * 0.6 + Math.sin(time * 0.7) * 0.4;
+    const targetLateral = steer * softness * dt * 3.0;
+    camera.position.addScaledVector(info.right, targetLateral);
+    const bank = info.tangent.clone().cross(info.up).dot(info.right) * 0.35;
+    state.yaw += bank * dt * 0.5;
+  }
 
-  terrainMaterial.uniforms.uTime.value = clock.elapsedTime;
-  waterMaterial.uniforms.uTime.value = clock.elapsedTime;
+  distEl.textContent = (state.distance / 1000).toFixed(2);
+  elevEl.textContent = Math.round(ground * 10) / 10;
+  const slope = 1.0 - Math.abs(getHeight(new THREE.Vector2(camera.position.x, camera.position.z))[0] ?? 0);
+  biomeEl.textContent = classifyBiome(ground, Math.max(0, 1 - sampleHeightJS(camera.position.x+1, camera.position.z)));
+
+  terrainMaterial.uniforms.uTime.value = time;
+  waterMaterial.uniforms.uTime.value = time;
+  skyMaterial.uniforms.uTime.value = time;
+  if (roadMesh) roadMesh.material.uniforms.uTime.value = time;
 
   renderer.render(scene, camera);
   requestAnimationFrame(tick);
@@ -593,8 +852,7 @@ function tick() {
 
 loading.classList.add('hidden');
 tick();
-// safety: hide loading after 3s even if tick stalls
-setTimeout(() => loading.classList.add('hidden'), 3000);
+setTimeout(() => loading.classList.add('hidden'), 4000);
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
