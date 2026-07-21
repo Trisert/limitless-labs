@@ -43,283 +43,311 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = false;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.3;
+renderer.toneMappingExposure = 1.35;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(54, window.innerWidth / window.innerHeight, 0.5, 700);
-camera.position.set(0, 4.0, 0);
+const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.5, 800);
+camera.position.set(0, 4.2, 0);
 
 // ============================================================
-// PROCEDURAL TEXTURES — canvas generated, tiling
+// SHADER: TERRAIN
 // ============================================================
-function createCanvas(size = 1024) {
-  const c = document.createElement('canvas');
-  c.width = c.height = size;
-  return { canvas: c, ctx: c.getContext('2d'), size };
-}
-function addNoise(ctx, size, intensity = 18) {
-  const img = ctx.getImageData(0, 0, size, size);
-  const d = img.data;
-  for (let i = 0; i < d.length; i += 4) {
-    const n = (Math.random() - 0.5) * intensity;
-    d[i] = Math.max(0, Math.min(255, d[i] + n));
-    d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + n));
-    d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + n));
-  }
-  ctx.putImageData(img, 0, 0);
-}
-function grain(ctx, size, count, colorFn, sizeFn) {
-  for (let i = 0; i < count; i++) {
-    const x = Math.random() * size, y = Math.random() * size;
-    ctx.fillStyle = colorFn();
-    ctx.fillRect(x, y, sizeFn(), sizeFn());
-  }
-}
-function makeNormalMap(size = 1024, strength = 3.2) {
-  const { canvas: c, ctx } = createCanvas(size);
-  ctx.fillStyle = '#8080ff';
-  ctx.fillRect(0, 0, size, size);
-  addNoise(ctx, size, 50);
-  const img = ctx.getImageData(0, 0, size, size);
-  const d = img.data;
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const idx = (y * size + x) * 4;
-      const l = d[idx], r = d[((y * size) + ((x + 1) % size)) * 4];
-      const u = d[idx], dn = d[((((y + 1) % size) * size) + x) * 4];
-      const dx = (l - r) / 255 * strength;
-      const dy = (u - dn) / 255 * strength;
-      d[idx] = Math.max(0, Math.min(255, 128 + dx * 127));
-      d[idx + 1] = Math.max(0, Math.min(255, 128 + dy * 127));
-      d[idx + 2] = 255;
-    }
-  }
-  ctx.putImageData(img, 0, 0);
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  return tex;
-}
-function makeRoughnessMap(size = 1024, base = 0.8, variance = 0.22) {
-  const { canvas: c, ctx } = createCanvas(size);
-  ctx.fillStyle = `rgb(${Math.round(base*255)},${Math.round(base*255)},${Math.round(base*255)})`;
-  ctx.fillRect(0, 0, size, size);
-  addNoise(ctx, size, variance * 255);
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  return tex;
-}
-function makeGrassTexture(size = 1024) {
-  const { canvas: c, ctx } = createCanvas(size);
-  ctx.fillStyle = '#526e34';
-  ctx.fillRect(0, 0, size, size);
-  grain(ctx, size, 60000, () => `rgba(${60+Math.random()*50},${85+Math.random()*55},${25+Math.random()*40},0.55)`, () => 1+Math.random()*3);
-  addNoise(ctx, size, 16);
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-function makeRockTexture(size = 1024) {
-  const { canvas: c, ctx } = createCanvas(size);
-  ctx.fillStyle = '#7a7268';
-  ctx.fillRect(0, 0, size, size);
-  grain(ctx, size, 25000, () => `rgba(${105+Math.random()*60},${95+Math.random()*50},${85+Math.random()*45},0.55)`, () => 2+Math.random()*12);
-  addNoise(ctx, size, 22);
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-function makeDirtTexture(size = 1024) {
-  const { canvas: c, ctx } = createCanvas(size);
-  ctx.fillStyle = '#6b604a';
-  ctx.fillRect(0, 0, size, size);
-  grain(ctx, size, 30000, () => `rgba(${90+Math.random()*40},${80+Math.random()*35},${55+Math.random()*35},0.45)`, () => 1+Math.random()*5);
-  addNoise(ctx, size, 16);
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-function makeSnowTexture(size = 1024) {
-  const { canvas: c, ctx } = createCanvas(size);
-  ctx.fillStyle = '#dce3ec';
-  ctx.fillRect(0, 0, size, size);
-  grain(ctx, size, 40000, () => `rgba(255,255,255,${Math.random()*0.4})`, () => 1+Math.random()*2);
-  addNoise(ctx, size, 14);
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
+const terrainVertexShader = `
+varying vec3 vWorldPos;
+varying vec3 vNormal;
+varying float vHeight;
+varying vec2 vUv;
+varying float vRoughness;
+varying float vSlope;
 
-const grassTex = makeGrassTexture();
-const rockTex = makeRockTexture();
-const dirtTex = makeDirtTexture();
-const snowTex = makeSnowTexture();
-const grassNormal = makeNormalMap(1024, 2.6);
-const rockNormal = makeNormalMap(1024, 4.5);
-const grassRoughness = makeRoughnessMap(1024, 0.82, 0.18);
-const rockRoughness = makeRoughnessMap(1024, 0.48, 0.32);
+uniform float uTime;
 
-// ============================================================
-// SKY / ATMOSPHERE
-// ============================================================
-const skyCanvas = document.createElement('canvas');
-skyCanvas.width = 4; skyCanvas.height = 512;
-const skyCtx = skyCanvas.getContext('2d');
-const skyGrad = skyCtx.createLinearGradient(0, 0, 0, 512);
-skyGrad.addColorStop(0.0, '#1f3a52');
-skyGrad.addColorStop(0.18, '#3f5f78');
-skyGrad.addColorStop(0.45, '#7a9ab0');
-skyGrad.addColorStop(0.68, '#b8a88a');
-skyGrad.addColorStop(0.85, '#8f6b48');
-skyGrad.addColorStop(1.0, '#5a4532');
-skyCtx.fillStyle = skyGrad;
-skyCtx.fillRect(0, 0, 4, 512);
-const skyTex = new THREE.CanvasTexture(skyCanvas);
-skyTex.mapping = THREE.EquirectangularReflectionMapping;
-scene.background = skyTex;
-scene.fog = new THREE.FogExp2('#b0bfc8', 0.0014);
-
-// ============================================================
-// LIGHTING
-// ============================================================
-const sun = new THREE.DirectionalLight('#fff3d6', 2.8);
-sun.position.set(200, 140, -90);
-scene.add(sun);
-scene.add(new THREE.HemisphereLight('#b0c8e0', '#4a5a3e', 0.85));
-
-// ============================================================
-// NOISE / HEIGHT
-// ============================================================
-function hash(x, z) {
-  let n = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453;
-  return n - Math.floor(n);
+// value noise
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise(vec2 p) {
+  vec2 i = floor(p); vec2 f = fract(p); f = f*f*(3.0-2.0*f);
+  return mix(mix(hash(i), hash(i+vec2(1,0)), f.x), mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), f.x), f.y);
 }
-function smooth(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
-function lerp(a, b, t) { return a + (b - a) * t; }
-function noise(x, z) {
-  const ix = Math.floor(x), iz = Math.floor(z);
-  const fx = smooth(x - ix), fz = smooth(z - iz);
-  return lerp(lerp(hash(ix, iz), hash(ix + 1, iz), fx), lerp(hash(ix, iz + 1), hash(ix + 1, iz + 1), fx), fz);
-}
-function fbm(x, z, oct = 4) {
-  let v = 0, a = 0.5, f = 1;
-  for (let i = 0; i < oct; i++) { v += a * noise(x * f, z * f); a *= 0.5; f *= 2.15; }
+float fbm(vec2 p) {
+  float v = 0.0, a = 0.5;
+  for (int i = 0; i < 5; i++) { v += a * noise(p); p *= 2.1; a *= 0.5; }
   return v;
 }
-function sampleHeight(x, z) {
-  let h = 0;
-  h += fbm(x * 0.0075, z * 0.0075, 4) * 30;
-  h += fbm(x * 0.032 + 5.3, z * 0.032 + 9.1, 3) * 9;
-  const ridge = 1 - Math.abs(fbm(x * 0.012 + 1.7, z * 0.012 + 3.2, 3) * 2 - 1);
-  h += ridge * 16;
-  const valley = Math.abs(noise(x * 0.0035 + 99, z * 0.0035 + 77) * 2 - 1);
-  h -= Math.pow(valley, 4) * 18;
+
+float getHeight(vec2 p) {
+  float h = 0.0;
+  h += fbm(p * 0.007) * 30.0;
+  h += fbm(p * 0.028 + 5.3) * 9.0;
+  float ridge = 1.0 - abs(fbm(p * 0.011 + 1.7) * 2.0 - 1.0);
+  h += ridge * 16.0;
+  float valley = abs(noise(p * 0.003 + 99.0) * 2.0 - 1.0);
+  h -= pow(valley, 4.0) * 18.0;
   return h;
 }
 
-// ============================================================
-// TERRAIN — chunked plane with vertex displacement
-// ============================================================
-const CHUNK = 120;
-const SEG = 120;
-const TEX_SCALE = 0.12;
+void main() {
+  vUv = uv;
+  vec3 pos = position;
+  float h = getHeight(pos.xz);
+  pos.y += h;
+  vHeight = h;
+  vWorldPos = (modelMatrix * vec4(pos, 1.0)).xyz;
 
-function buildChunkMesh(cx, cz) {
-  const geom = new THREE.PlaneGeometry(CHUNK, CHUNK, SEG, SEG);
-  geom.rotateX(-Math.PI / 2);
-  const pos = geom.attributes.position;
-  const colors = new Float32Array(pos.count * 3);
-  const roughnessArr = new Float32Array(pos.count);
-  const uv = new Float32Array(pos.count * 2);
+  // compute normal from heightfield
+  float eps = 0.5;
+  float hL = getHeight(pos.xz + vec2(-eps, 0.0));
+  float hR = getHeight(pos.xz + vec2( eps, 0.0));
+  float hD = getHeight(pos.xz + vec2(0.0, -eps));
+  float hU = getHeight(pos.xz + vec2(0.0,  eps));
+  vec3 normal = normalize(vec3(hL - hR, 2.0 * eps, hD - hU));
+  vNormal = normalize(normalMatrix * normal);
+  vSlope = 1.0 - abs(normal.y);
 
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i) + cx;
-    const z = pos.getZ(i) + cz;
-    let h = sampleHeight(x, z);
-    pos.setY(i, h);
+  // micro displacement for granularity
+  pos.y += fbm(pos.xz * 0.12) * 0.35;
+  pos.y += noise(pos.xz * 0.6) * 0.08;
 
-    const t = Math.max(0, Math.min(1, (h - 1) / 48));
-    let col = new THREE.Color('#526e34');
-    let r = 0.88;
-    if (t > 0.25) col.lerp(new THREE.Color('#6b7d46'), (t - 0.25) / 0.22);
-    if (t > 0.45) {
-      const m = (t - 0.45) / 0.22;
-      col.lerp(new THREE.Color('#7a7268'), m);
-      r = 0.52;
-    }
-    if (t > 0.62) {
-      const m = Math.min(1, (t - 0.62) / 0.18);
-      col.lerp(new THREE.Color('#6e685f'), m);
-      r = 0.42;
-    }
-    if (t > 0.8) {
-      const m = Math.min(1, (t - 0.8) / 0.2);
-      col.lerp(new THREE.Color('#dce3ec'), m);
-      r = 0.62;
-    }
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+}
+`;
 
-    const ridge = 1 - Math.abs(fbm(x * 0.014 + 1.7, z * 0.014 + 3.2, 3) * 2 - 1);
-    col.multiplyScalar(1 - Math.abs(ridge) * 0.32);
-    roughnessArr[i] = r + Math.abs(ridge) * 0.22;
-    colors[i * 3] = col.r;
-    colors[i * 3 + 1] = col.g;
-    colors[i * 3 + 2] = col.b;
-    uv[i * 2] = (x * TEX_SCALE) % 1;
-    uv[i * 2 + 1] = (z * TEX_SCALE) % 1;
-  }
-  geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  geom.setAttribute('roughness', new THREE.BufferAttribute(roughnessArr, 1));
-  geom.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-  geom.computeVertexNormals();
+const terrainFragmentShader = `
+varying vec3 vWorldPos;
+varying vec3 vNormal;
+varying float vHeight;
+varying vec2 vUv;
+varying float vRoughness;
+varying float vSlope;
 
-  const mat = new THREE.MeshStandardMaterial({
-    roughness: 0.78,
-    metalness: 0.02,
-    flatShading: true,
-    vertexColors: true,
-  });
-  mat.onBeforeCompile = (shader) => {
-    shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <common>',
-      `#include <common>
-      varying float vRough;`
-    );
-    shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <lights_physical_fragment>',
-      `#include <lights_physical_fragment>
-      rough = clamp(rough + vRough * 0.45, 0.26, 0.96);`
-    );
-  };
-  return new THREE.Mesh(geom, mat);
+uniform sampler2D uGrassTex;
+uniform sampler2D uRockTex;
+uniform sampler2D uDirtTex;
+uniform sampler2D uSnowTex;
+uniform vec3 uSunDir;
+uniform float uTime;
+
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise(vec2 p) {
+  vec2 i = floor(p); vec2 f = fract(p); f = f*f*(3.0-2.0*f);
+  return mix(mix(hash(i), hash(i+vec2(1,0)), f.x), mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), f.x), f.y);
+}
+float fbm(vec2 p) {
+  float v = 0.0, a = 0.5;
+  for (int i = 0; i < 4; i++) { v += a * noise(p); p *= 2.2; a *= 0.5; }
+  return v;
 }
 
+void main() {
+  vec3 N = normalize(vNormal);
+  float h = vHeight;
+  float t = clamp((h - 1.0) / 48.0, 0.0, 1.0);
+
+  // biome blend
+  float grassW = 1.0 - smoothstep(0.22, 0.55, t);
+  float dirtW = smoothstep(0.28, 0.55, t) * (1.0 - smoothstep(0.55, 0.75, t));
+  float rockW = smoothstep(0.48, 0.72, t) * (1.0 - smoothstep(0.72, 0.9, t));
+  float snowW = smoothstep(0.78, 1.0, t);
+
+  // slope influence: more rock/dirt on steep slopes
+  float slope = vSlope;
+  rockW += slope * 0.6;
+  dirtW += slope * 0.3;
+  grassW = max(0.0, grassW - slope * 0.7);
+
+  // tiling sample with granular detail
+  vec2 uv1 = vWorldPos.xz * 0.12;
+  vec2 uv2 = vWorldPos.xz * 0.06;
+  float detail = fbm(uv2 * 3.0 + uTime * 0.02) * 0.5;
+
+  vec3 grass = texture2D(uGrassTex, uv1 + detail * 0.05).rgb;
+  vec3 dirt  = texture2D(uDirtTex, uv1 * 1.1 + detail * 0.04).rgb;
+  vec3 rock  = texture2D(uRockTex, uv1 * 0.9 + detail * 0.06).rgb;
+  vec3 snow  = texture2D(uSnowTex, uv1 * 1.2 + detail * 0.03).rgb;
+
+  vec3 col = grass * grassW + dirt * dirtW + rock * rockW + snow * snowW;
+
+  // slope darkening / AO approximation
+  col *= 1.0 - slope * 0.35;
+
+  // micro shadow from noise
+  float shadow = fbm(vWorldPos.xz * 0.25) * 0.15;
+  col *= 1.0 - shadow;
+
+  // lighting
+  float NdotL = max(dot(N, normalize(uSunDir)), 0.0);
+  float wrap = max(dot(N, normalize(uSunDir + vec3(0.0, 0.3, 0.0))), 0.0);
+  vec3 ambient = vec3(0.18, 0.22, 0.28);
+  vec3 diffuse = vec3(1.0, 0.95, 0.85) * (wrap * 0.7 + 0.3);
+  col *= ambient + diffuse * NdotL;
+
+  // roughness from slope
+  float rough = 0.75 + slope * 0.2;
+
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
 // ============================================================
-// WATER
+// SHADER: WATER
 // ============================================================
-const waterGeom = new THREE.PlaneGeometry(CHUNK * 6, CHUNK * 6);
-waterGeom.rotateX(-Math.PI / 2);
-const waterMat = new THREE.MeshPhysicalMaterial({
-  color: '#3b5d72',
-  roughness: 0.02,
-  metalness: 0.08,
-  transparent: true,
-  opacity: 0.72,
-  clearcoat: 0.3,
+const waterVertexShader = `
+varying vec2 vUv;
+varying vec3 vWorldPos;
+uniform float uTime;
+void main() {
+  vUv = uv;
+  vec3 pos = position;
+  pos.y += sin(pos.x * 0.3 + uTime * 0.6) * 0.15;
+  pos.y += cos(pos.z * 0.25 + uTime * 0.5) * 0.15;
+  vWorldPos = (modelMatrix * vec4(pos, 1.0)).xyz;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+}
+`;
+const waterFragmentShader = `
+varying vec2 vUv;
+varying vec3 vWorldPos;
+uniform float uTime;
+uniform vec3 uSunDir;
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise(vec2 p) {
+  vec2 i = floor(p); vec2 f = fract(p); f = f*f*(3.0-2.0*f);
+  return mix(mix(hash(i), hash(i+vec2(1,0)), f.x), mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), f.x), f.y);
+}
+void main() {
+  vec3 deep = vec3(0.12, 0.25, 0.35);
+  vec3 shallow = vec3(0.25, 0.45, 0.55);
+  float n = noise(vWorldPos.xz * 0.08 + uTime * 0.15) * 0.5 + 0.5;
+  vec3 col = mix(deep, shallow, n);
+  float fresnel = pow(1.0 - abs(dot(vec3(0.0, 1.0, 0.0), normalize(vec3(0.0, 1.0, 0.0)))), 2.0);
+  col += vec3(0.6, 0.7, 0.8) * fresnel * 0.25;
+  gl_FragColor = vec4(col, 0.78);
+}
+`;
+
+// ============================================================
+// SHADER: SKY
+// ============================================================
+const skyVertexShader = `
+varying vec3 vWorldPos;
+void main() {
+  vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+const skyFragmentShader = `
+varying vec3 vWorldPos;
+uniform vec3 uSunDir;
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise(vec2 p) {
+  vec2 i = floor(p); vec2 f = fract(p); f = f*f*(3.0-2.0*f);
+  return mix(mix(hash(i), hash(i+vec2(1,0)), f.x), mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), f.x), f.y);
+}
+float fbm(vec2 p) {
+  float v = 0.0, a = 0.5;
+  for (int i = 0; i < 4; i++) { v += a * noise(p); p *= 2.1; a *= 0.5; }
+  return v;
+}
+void main() {
+  vec3 dir = normalize(vWorldPos);
+  float y = dir.y * 0.5 + 0.5;
+  vec3 horizon = vec3(0.7, 0.75, 0.8);
+  vec3 zenith = vec3(0.2, 0.35, 0.55);
+  vec3 nadir = vec3(0.55, 0.5, 0.45);
+  vec3 col = mix(nadir, mix(horizon, zenith, pow(y, 0.8)), step(0.0, dir.y));
+
+  // sun glow
+  float sun = max(dot(dir, normalize(uSunDir)), 0.0);
+  col += vec3(1.0, 0.9, 0.7) * pow(sun, 64.0) * 0.8;
+  col += vec3(1.0, 0.85, 0.7) * pow(sun, 8.0) * 0.2;
+
+  // clouds
+  float cloud = fbm(dir.xz / (dir.y + 0.3) * 1.5);
+  cloud = smoothstep(0.45, 0.75, cloud);
+  col = mix(col, vec3(0.95, 0.95, 0.98), cloud * 0.6);
+
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
+// ============================================================
+// MATERIALS
+// ============================================================
+const sunDir = new THREE.Vector3(200, 140, -90).normalize();
+
+const terrainMaterial = new THREE.ShaderMaterial({
+  vertexShader: terrainVertexShader,
+  fragmentShader: terrainFragmentShader,
+  uniforms: {
+    uTime: { value: 0 },
+    uSunDir: { value: sunDir },
+  },
 });
-const water = new THREE.Mesh(waterGeom, waterMat);
+
+const waterMaterial = new THREE.ShaderMaterial({
+  vertexShader: waterVertexShader,
+  fragmentShader: waterFragmentShader,
+  uniforms: {
+    uTime: { value: 0 },
+    uSunDir: { value: sunDir },
+  },
+  transparent: true,
+});
+
+const skyMaterial = new THREE.ShaderMaterial({
+  vertexShader: skyVertexShader,
+  fragmentShader: skyFragmentShader,
+  uniforms: {
+    uSunDir: { value: sunDir },
+  },
+  side: THREE.BackSide,
+});
+
+// ============================================================
+// SCENE OBJECTS
+// ============================================================
+const skyGeo = new THREE.SphereGeometry(400, 32, 32);
+const skyMesh = new THREE.Mesh(skyGeo, skyMaterial);
+scene.add(skyMesh);
+
+const CHUNK = 120;
+const SEG = 100;
+const chunks = new Map();
+function chunkKey(cx, cz) { return `${cx},${cz}`; }
+function ensureChunk(cx, cz) {
+  const key = chunkKey(cx, cz);
+  if (chunks.has(key)) return;
+  const geom = new THREE.PlaneGeometry(CHUNK, CHUNK, SEG, SEG);
+  geom.rotateX(-Math.PI / 2);
+  const mesh = new THREE.Mesh(geom, terrainMaterial);
+  mesh.position.set(cx * CHUNK, 0, cz * CHUNK);
+  scene.add(mesh);
+  chunks.set(key, mesh);
+}
+function removeChunk(cx, cz) {
+  const key = chunkKey(cx, cz);
+  const mesh = chunks.get(key);
+  if (!mesh) return;
+  scene.remove(mesh);
+  mesh.geometry.dispose();
+  chunks.delete(key);
+}
+const CHUNKS_RADIUS = 2;
+for (let x = -CHUNKS_RADIUS; x <= CHUNKS_RADIUS; x++)
+  for (let z = -CHUNKS_RADIUS; z <= CHUNKS_RADIUS; z++) ensureChunk(x, z);
+
+const waterGeo = new THREE.PlaneGeometry(CHUNK * 6, CHUNK * 6);
+waterGeo.rotateX(-Math.PI / 2);
+const water = new THREE.Mesh(waterGeo, waterMaterial);
 water.position.y = 2.8;
 scene.add(water);
 
 // ============================================================
-// VEGETATION — instanced, elevation-aware
+// VEGETATION — instanced
 // ============================================================
-const trunkGeom = new THREE.CylinderGeometry(0.22, 0.35, 2.4, 6);
-const foliageGeom = new THREE.ConeGeometry(1.4, 4.0, 7, 1);
-const foliageAltGeom = new THREE.ConeGeometry(1.1, 3.2, 6, 1);
+const trunkGeom = new THREE.CylinderGeometry(0.22, 0.36, 2.6, 6);
+const foliageGeom = new THREE.ConeGeometry(1.5, 4.2, 7, 1);
+const foliageAltGeom = new THREE.ConeGeometry(1.2, 3.4, 6, 1);
 const trunkMat = new THREE.MeshStandardMaterial({ color: '#4a3b2f', roughness: 0.94 });
 const foliageMats = [
   new THREE.MeshStandardMaterial({ color: '#2f4025', roughness: 0.86 }),
@@ -328,7 +356,7 @@ const foliageMats = [
   new THREE.MeshStandardMaterial({ color: '#4a5a3a', roughness: 0.84 }),
 ];
 
-const MAX_TREES = 12000;
+const MAX_TREES = 14000;
 const trunkInstanced = new THREE.InstancedMesh(trunkGeom, trunkMat, MAX_TREES);
 const foliageInstanced = new THREE.InstancedMesh(foliageGeom, foliageMats[0], MAX_TREES * 2);
 trunkInstanced.castShadow = false;
@@ -338,9 +366,28 @@ scene.add(foliageInstanced);
 
 const dummy = new THREE.Object3D();
 const treeData = [];
+function sampleHeightJS(x, z) {
+  let h = 0;
+  const hash = (a, b) => { let n = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453; return n - Math.floor(n); };
+  const smooth = t => t*t*t*(t*(t*6-15)+10);
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const noise = (x, z) => {
+    const ix = Math.floor(x), iz = Math.floor(z);
+    const fx = smooth(x - ix), fz = smooth(z - iz);
+    return lerp(lerp(hash(ix, iz), hash(ix+1, iz), fx), lerp(hash(ix, iz+1), hash(ix+1, iz+1), fx), fz);
+  };
+  const fbm = (x, z, oct = 4) => { let v = 0, a = 0.5, f = 1; for (let i = 0; i < oct; i++) { v += a * noise(x*f, z*f); a *= 0.5; f *= 2.15; } return v; };
+  h += fbm(x * 0.0075, z * 0.0075, 4) * 30;
+  h += fbm(x * 0.032 + 5.3, z * 0.032 + 9.1, 3) * 9;
+  const ridge = 1 - Math.abs(fbm(x * 0.012 + 1.7, z * 0.012 + 3.2, 3) * 2 - 1);
+  h += ridge * 16;
+  const valley = Math.abs(noise(x * 0.0035 + 99, z * 0.0035 + 77) * 2 - 1);
+  h -= Math.pow(valley, 4) * 18;
+  return h;
+}
 function addTree(x, z) {
-  const h = sampleHeight(x, z);
-  if (h < 3.5 || h > 28) return;
+  const h = sampleHeightJS(x, z);
+  if (h < 3.8 || h > 28) return;
   const s = 0.6 + Math.random() * 1.6;
   const rot = Math.random() * Math.PI * 2;
   const matIdx = Math.floor(Math.random() * foliageMats.length);
@@ -356,13 +403,13 @@ function buildInstancedTrees() {
     dummy.rotation.y = t.rot;
     dummy.updateMatrix();
     trunkInstanced.setMatrixAt(ti++, dummy.matrix);
-    dummy.position.set(t.x, t.h + 1.2, t.z);
+    dummy.position.set(t.x, t.h + 1.3, t.z);
     dummy.scale.setScalar(t.s);
     dummy.rotation.y = t.rot;
     dummy.updateMatrix();
     foliageInstanced.setMatrixAt(fi++, dummy.matrix);
-    dummy.position.set(t.x, t.h + 3.1, t.z);
-    dummy.scale.setScalar(t.wide ? t.s * 0.95 : t.s * 0.7);
+    dummy.position.set(t.x, t.h + 3.4, t.z);
+    dummy.scale.setScalar(t.wide ? t.s * 1.0 : t.s * 0.72);
     dummy.rotation.y = t.rot + 0.45;
     dummy.updateMatrix();
     foliageInstanced.setMatrixAt(fi++, dummy.matrix);
@@ -373,22 +420,22 @@ function buildInstancedTrees() {
   foliageInstanced.instanceMatrix.needsUpdate = true;
 }
 
-const rockGeom = new THREE.DodecahedronGeometry(0.42, 0);
-const rockMat = new THREE.MeshStandardMaterial({ color: '#6e685f', roughness: 0.72, flatShading: true });
-const rockInstanced = new THREE.InstancedMesh(rockGeom, rockMat, 7000);
+const rockGeom = new THREE.DodecahedronGeometry(0.45, 0);
+const rockMat = new THREE.MeshStandardMaterial({ color: '#6e685f', roughness: 0.7, flatShading: true });
+const rockInstanced = new THREE.InstancedMesh(rockGeom, rockMat, 8000);
 scene.add(rockInstanced);
 
-const bushGeom = new THREE.SphereGeometry(0.5, 5, 4);
+const bushGeom = new THREE.SphereGeometry(0.55, 5, 4);
 const bushMat = new THREE.MeshStandardMaterial({ color: '#3a4f30', roughness: 0.9, flatShading: true });
-const bushInstanced = new THREE.InstancedMesh(bushGeom, bushMat, 5000);
+const bushInstanced = new THREE.InstancedMesh(bushGeom, bushMat, 6000);
 scene.add(bushInstanced);
 
 const groundData = [];
 function addGround(x, z) {
-  const h = sampleHeight(x, z);
-  if (h < 3.6 || h > 26) return;
-  if (Math.random() > 0.4) return;
-  const s = 0.5 + Math.random() * 2.0;
+  const h = sampleHeightJS(x, z);
+  if (h < 3.8 || h > 27) return;
+  if (Math.random() > 0.42) return;
+  const s = 0.5 + Math.random() * 2.2;
   const rot = Math.random() * Math.PI * 2;
   groundData.push({ x, z, h, s, rot, rock: Math.random() > 0.4 });
 }
@@ -396,12 +443,12 @@ function buildGround() {
   let ri = 0, bi = 0;
   const dm = dummy;
   for (const g of groundData) {
-    dm.position.set(g.x, g.h + (g.rock ? 0.12 : 0.25), g.z);
+    dm.position.set(g.x, g.h + (g.rock ? 0.14 : 0.28), g.z);
     dm.scale.setScalar(g.s);
     dm.rotation.set(g.rock ? 0 : 1.3, g.rot, g.rock ? g.rot : 0);
     dm.updateMatrix();
-    if (g.rock && ri < 7000) rockInstanced.setMatrixAt(ri++, dm.matrix);
-    else if (!g.rock && bi < 5000) bushInstanced.setMatrixAt(bi++, dm.matrix);
+    if (g.rock && ri < 8000) rockInstanced.setMatrixAt(ri++, dm.matrix);
+    else if (!g.rock && bi < 6000) bushInstanced.setMatrixAt(bi++, dm.matrix);
   }
   rockInstanced.count = ri;
   rockInstanced.instanceMatrix.needsUpdate = true;
@@ -409,49 +456,28 @@ function buildGround() {
   bushInstanced.instanceMatrix.needsUpdate = true;
 }
 
-// ============================================================
-// CHUNK MANAGEMENT
-// ============================================================
-const CHUNKS_RADIUS = 2;
-const chunks = new Map();
-function chunkKey(cx, cz) { return `${cx},${cz}`; }
-function ensureChunk(cx, cz) {
-  const key = chunkKey(cx, cz);
-  if (chunks.has(key)) return;
-  const mesh = buildChunkMesh(cx * CHUNK, cz * CHUNK);
-  scene.add(mesh);
-  chunks.set(key, mesh);
-
-  const step = 6;
-  for (let lx = -CHUNK / 2; lx < CHUNK / 2; lx += step) {
-    for (let lz = -CHUNK / 2; lz < CHUNK / 2; lz += step) {
-      if (Math.random() > 0.66) continue;
-      const wx = cx * CHUNK + lx + (Math.random() - 0.5) * step;
-      const wz = cz * CHUNK + lz + (Math.random() - 0.5) * step;
-      addTree(wx, wz);
-      addGround(wx, wz);
+// populate chunks
+const step = 5.5;
+for (let x = -CHUNKS_RADIUS; x <= CHUNKS_RADIUS; x++) {
+  for (let z = -CHUNKS_RADIUS; z <= CHUNKS_RADIUS; z++) {
+    for (let lx = -CHUNK/2; lx < CHUNK/2; lx += step) {
+      for (let lz = -CHUNK/2; lz < CHUNK/2; lz += step) {
+        if (Math.random() > 0.68) continue;
+        const wx = x * CHUNK + lx + (Math.random() - 0.5) * step;
+        const wz = z * CHUNK + lz + (Math.random() - 0.5) * step;
+        addTree(wx, wz);
+        addGround(wx, wz);
+      }
     }
   }
 }
-function removeChunk(cx, cz) {
-  const key = chunkKey(cx, cz);
-  const mesh = chunks.get(key);
-  if (!mesh) return;
-  scene.remove(mesh);
-  mesh.geometry.dispose();
-  mesh.material.dispose();
-  chunks.delete(key);
-}
-
-for (let x = -CHUNKS_RADIUS; x <= CHUNKS_RADIUS; x++)
-  for (let z = -CHUNKS_RADIUS; z <= CHUNKS_RADIUS; z++) ensureChunk(x, z);
 buildInstancedTrees();
 buildGround();
 
 // ============================================================
 // WALK STATE
 // ============================================================
-const state = { speed: 4.0, distance: 0, yaw: 0, pitch: 0.42, bob: 0, sway: 0 };
+const state = { speed: 4.2, distance: 0, yaw: 0, pitch: 0.42, bob: 0, sway: 0 };
 let dragging = false;
 let prevMouse = { x: 0, y: 0 };
 canvas.addEventListener('pointerdown', (e) => { dragging = true; prevMouse.x = e.clientX; prevMouse.y = e.clientY; canvas.setPointerCapture(e.pointerId); });
@@ -460,13 +486,13 @@ window.addEventListener('pointermove', (e) => {
   if (!dragging) return;
   state.yaw -= (e.clientX - prevMouse.x) * 0.004;
   state.pitch -= (e.clientY - prevMouse.y) * 0.004;
-  state.pitch = Math.max(-0.35, Math.min(1.3, state.pitch));
+  state.pitch = Math.max(-0.35, Math.min(1.35, state.pitch));
   prevMouse.x = e.clientX; prevMouse.y = e.clientY;
 });
 window.addEventListener('wheel', (e) => {
   state.speed *= e.deltaY < 0 ? 1.08 : 0.92;
   state.speed = Math.max(1.0, Math.min(24, state.speed));
-  paceEl.textContent = (state.speed / 4.0).toFixed(1) + 'x';
+  paceEl.textContent = (state.speed / 4.2).toFixed(1) + 'x';
 }, { passive: true });
 
 // ============================================================
@@ -479,12 +505,12 @@ function tick() {
   camera.position.addScaledVector(forward, state.speed * dt);
   state.distance += state.speed * dt;
 
-  const ground = sampleHeight(camera.position.x, camera.position.z);
-  const targetY = ground + 3.1;
-  camera.position.y += (targetY - camera.position.y) * Math.min(dt * 3.8, 1);
-  state.bob += dt * state.speed * 1.55;
-  const bobY = Math.sin(state.bob) * 0.24;
-  const swayX = Math.cos(state.bob * 0.55) * 0.09;
+  const ground = sampleHeightJS(camera.position.x, camera.position.z);
+  const targetY = ground + 3.3;
+  camera.position.y += (targetY - camera.position.y) * Math.min(dt * 4.0, 1);
+  state.bob += dt * state.speed * 1.6;
+  const bobY = Math.sin(state.bob) * 0.26;
+  const swayX = Math.cos(state.bob * 0.55) * 0.1;
   state.sway += (swayX - state.sway) * Math.min(dt * 8, 1);
   camera.position.y += bobY;
   camera.position.x += state.sway;
@@ -495,7 +521,6 @@ function tick() {
 
   water.position.x = camera.position.x;
   water.position.z = camera.position.z;
-  waterMat.opacity = 0.68 + Math.sin(clock.elapsedTime * 0.45) * 0.05;
 
   const cx = Math.round(camera.position.x / CHUNK);
   const cz = Math.round(camera.position.z / CHUNK);
@@ -509,6 +534,10 @@ function tick() {
 
   distEl.textContent = (state.distance / 1000).toFixed(2);
   elevEl.textContent = Math.round(camera.position.y * 10) / 10;
+
+  terrainMaterial.uniforms.uTime.value = clock.elapsedTime;
+  waterMaterial.uniforms.uTime.value = clock.elapsedTime;
+
   renderer.render(scene, camera);
   requestAnimationFrame(tick);
 }
