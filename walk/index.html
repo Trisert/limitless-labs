@@ -43,22 +43,21 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = false;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.15;
+renderer.toneMappingExposure = 1.2;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.5, 500);
-camera.position.set(0, 3.5, 0);
+const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.5, 600);
+camera.position.set(0, 3.6, 0);
 
 // ============================================================
-// TEXTURE GENERATION (procedural tiling textures)
+// TEXTURES (tiling, triplanar-ready)
 // ============================================================
 function createCanvas(size = 512) {
   const c = document.createElement('canvas');
   c.width = c.height = size;
   return { canvas: c, ctx: c.getContext('2d'), size };
 }
-
 function addNoise(ctx, size, intensity = 18) {
   const img = ctx.getImageData(0, 0, size, size);
   const d = img.data;
@@ -70,12 +69,11 @@ function addNoise(ctx, size, intensity = 18) {
   }
   ctx.putImageData(img, 0, 0);
 }
-
-function makeNormalMap(size = 512, strength = 2.5) {
+function makeNormalMap(size = 512, strength = 2.8) {
   const { canvas: c, ctx } = createCanvas(size);
   ctx.fillStyle = '#8080ff';
   ctx.fillRect(0, 0, size, size);
-  addNoise(ctx, size, 35);
+  addNoise(ctx, size, 40);
   const img = ctx.getImageData(0, 0, size, size);
   const d = img.data;
   for (let y = 0; y < size; y++) {
@@ -91,59 +89,27 @@ function makeNormalMap(size = 512, strength = 2.5) {
     }
   }
   ctx.putImageData(img, 0, 0);
-  return new THREE.CanvasTexture(c);
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return tex;
 }
-
-function makeRoughnessMap(size = 512, base = 0.75, variance = 0.2) {
+function makeRoughnessMap(size = 512, base = 0.8, variance = 0.2) {
   const { canvas: c, ctx } = createCanvas(size);
-  ctx.fillStyle = `rgb(${Math.round(base * 255)},${Math.round(base * 255)},${Math.round(base * 255)})`;
+  ctx.fillStyle = `rgb(${Math.round(base*255)},${Math.round(base*255)},${Math.round(base*255)})`;
   ctx.fillRect(0, 0, size, size);
   addNoise(ctx, size, variance * 255);
   const tex = new THREE.CanvasTexture(c);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   return tex;
 }
-
 function makeGrassTexture(size = 512) {
   const { canvas: c, ctx } = createCanvas(size);
   ctx.fillStyle = '#4f6632';
   ctx.fillRect(0, 0, size, size);
-  for (let i = 0; i < 25000; i++) {
+  for (let i = 0; i < 30000; i++) {
     const x = Math.random() * size, y = Math.random() * size;
-    ctx.fillStyle = `rgba(${75 + Math.random()*30},${100 + Math.random()*35},${40 + Math.random()*25},0.7)`;
-    ctx.fillRect(x, y, 1 + Math.random() * 2, 1 + Math.random() * 4);
-  }
-  addNoise(ctx, size, 12);
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
-function makeRockTexture(size = 512) {
-  const { canvas: c, ctx } = createCanvas(size);
-  ctx.fillStyle = '#7a7268';
-  ctx.fillRect(0, 0, size, size);
-  for (let i = 0; i < 8000; i++) {
-    const x = Math.random() * size, y = Math.random() * size;
-    ctx.fillStyle = `rgba(${120 + Math.random()*40},${110 + Math.random()*35},${100 + Math.random()*30},0.6)`;
-    ctx.fillRect(x, y, 2 + Math.random() * 8, 2 + Math.random() * 6);
-  }
-  addNoise(ctx, size, 15);
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
-function makeDirtTexture(size = 512) {
-  const { canvas: c, ctx } = createCanvas(size);
-  ctx.fillStyle = '#6b604a';
-  ctx.fillRect(0, 0, size, size);
-  for (let i = 0; i < 15000; i++) {
-    const x = Math.random() * size, y = Math.random() * size;
-    ctx.fillStyle = `rgba(${100 + Math.random()*25},${90 + Math.random()*20},${65 + Math.random()*20},0.5)`;
-    ctx.fillRect(x, y, 1 + Math.random() * 3, 1 + Math.random() * 3);
+    ctx.fillStyle = `rgba(${70 + Math.random()*35},${95 + Math.random()*40},${35 + Math.random()*30},0.6)`;
+    ctx.fillRect(x, y, 1 + Math.random() * 2, 2 + Math.random() * 5);
   }
   addNoise(ctx, size, 10);
   const tex = new THREE.CanvasTexture(c);
@@ -151,18 +117,46 @@ function makeDirtTexture(size = 512) {
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }
-
+function makeRockTexture(size = 512) {
+  const { canvas: c, ctx } = createCanvas(size);
+  ctx.fillStyle = '#7a7268';
+  ctx.fillRect(0, 0, size, size);
+  for (let i = 0; i < 12000; i++) {
+    const x = Math.random() * size, y = Math.random() * size;
+    ctx.fillStyle = `rgba(${115 + Math.random()*50},${105 + Math.random()*40},${95 + Math.random()*35},0.55)`;
+    ctx.fillRect(x, y, 2 + Math.random() * 10, 2 + Math.random() * 8);
+  }
+  addNoise(ctx, size, 18);
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+function makeDirtTexture(size = 512) {
+  const { canvas: c, ctx } = createCanvas(size);
+  ctx.fillStyle = '#6b604a';
+  ctx.fillRect(0, 0, size, size);
+  for (let i = 0; i < 18000; i++) {
+    const x = Math.random() * size, y = Math.random() * size;
+    ctx.fillStyle = `rgba(${95 + Math.random()*30},${85 + Math.random()*25},${60 + Math.random()*25},0.45)`;
+    ctx.fillRect(x, y, 1 + Math.random() * 3, 1 + Math.random() * 3);
+  }
+  addNoise(ctx, size, 12);
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
 function makeSnowTexture(size = 512) {
   const { canvas: c, ctx } = createCanvas(size);
   ctx.fillStyle = '#e8ecf2';
   ctx.fillRect(0, 0, size, size);
-  for (let i = 0; i < 20000; i++) {
+  for (let i = 0; i < 24000; i++) {
     const x = Math.random() * size, y = Math.random() * size;
-    const a = Math.random() * 0.3;
-    ctx.fillStyle = `rgba(255,255,255,${a})`;
+    ctx.fillStyle = `rgba(255,255,255,${Math.random()*0.35})`;
     ctx.fillRect(x, y, 1 + Math.random() * 2, 1 + Math.random() * 2);
   }
-  addNoise(ctx, size, 8);
+  addNoise(ctx, size, 10);
   const tex = new THREE.CanvasTexture(c);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -173,48 +167,42 @@ const grassTex = makeGrassTexture();
 const rockTex = makeRockTexture();
 const dirtTex = makeDirtTexture();
 const snowTex = makeSnowTexture();
-const grassNormal = makeNormalMap(512, 2.0);
-const rockNormal = makeNormalMap(512, 3.5);
-const grassRoughness = makeRoughnessMap(512, 0.85, 0.15);
-const rockRoughness = makeRoughnessMap(512, 0.55, 0.25);
+const grassNormal = makeNormalMap(512, 2.2);
+const rockNormal = makeNormalMap(512, 3.8);
+const grassRoughness = makeRoughnessMap(512, 0.82, 0.15);
+const rockRoughness = makeRoughnessMap(512, 0.52, 0.28);
 
 // ============================================================
-// SKY
+// SKY / ATMOSPHERE
 // ============================================================
 const skyCanvas = document.createElement('canvas');
 skyCanvas.width = 2; skyCanvas.height = 512;
 const skyCtx = skyCanvas.getContext('2d');
 const skyGrad = skyCtx.createLinearGradient(0, 0, 0, 512);
-skyGrad.addColorStop(0.0, '#4a6fa5');
-skyGrad.addColorStop(0.25, '#87a7c9');
-skyGrad.addColorStop(0.55, '#c5d5e0');
-skyGrad.addColorStop(0.75, '#d8cdb8');
-skyGrad.addColorStop(0.9, '#c9a87c');
-skyGrad.addColorStop(1.0, '#8b7355');
+skyGrad.addColorStop(0.0, '#3e5f82');
+skyGrad.addColorStop(0.22, '#6d8fad');
+skyGrad.addColorStop(0.5, '#a8bfcf');
+skyGrad.addColorStop(0.72, '#cfc3aa');
+skyGrad.addColorStop(0.88, '#b8956e');
+skyGrad.addColorStop(1.0, '#7a5f42');
 skyCtx.fillStyle = skyGrad;
 skyCtx.fillRect(0, 0, 2, 512);
 const skyTex = new THREE.CanvasTexture(skyCanvas);
 skyTex.mapping = THREE.EquirectangularReflectionMapping;
 scene.background = skyTex;
-
-// ============================================================
-// FOG
-// ============================================================
-scene.fog = new THREE.FogExp2('#c5d5e0', 0.0018);
+scene.fog = new THREE.FogExp2('#b8c8d2', 0.0016);
 
 // ============================================================
 // LIGHTING
 // ============================================================
-const sun = new THREE.DirectionalLight('#fff3d6', 2.2);
-sun.position.set(150, 100, -60);
+const sun = new THREE.DirectionalLight('#fff3d6', 2.4);
+sun.position.set(160, 110, -70);
 scene.add(sun);
-const sun2 = new THREE.DirectionalLight('#ffe4c4', 0.4);
-sun2.position.set(-50, 30, 40);
-scene.add(sun2);
-scene.add(new THREE.HemisphereLight('#b8d0e4', '#5c6b4f', 0.7));
+scene.add(new THREE.DirectionalLight('#ffe4c4', 0.35).position.set(-60, 40, 50) && new THREE.DirectionalLight('#ffe4c4', 0.35));
+scene.add(new THREE.HemisphereLight('#b4cde0', '#4f5e42', 0.75));
 
 // ============================================================
-// NOISE
+// NOISE / HEIGHT
 // ============================================================
 function hash(x, z) {
   let n = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453;
@@ -227,46 +215,38 @@ function noise(x, z) {
   const fx = smooth(x - ix), fz = smooth(z - iz);
   return lerp(lerp(hash(ix, iz), hash(ix + 1, iz), fx), lerp(hash(ix, iz + 1), hash(ix + 1, iz + 1), fx), fz);
 }
-function fbm(x, z, octaves = 4) {
-  let v = 0, amp = 0.5, freq = 1;
-  for (let i = 0; i < octaves; i++) { v += amp * noise(x * freq, z * freq); amp *= 0.5; freq *= 2.1; }
+function fbm(x, z, oct = 4) {
+  let v = 0, a = 0.5, f = 1;
+  for (let i = 0; i < oct; i++) { v += a * noise(x * f, z * f); a *= 0.5; f *= 2.15; }
   return v;
 }
-
 function sampleHeight(x, z) {
   let h = 0;
-  h += fbm(x * 0.010, z * 0.010, 4) * 24;
-  h += fbm(x * 0.040 + 5.3, z * 0.040 + 9.1, 3) * 7;
-  const ridge = 1 - Math.abs(fbm(x * 0.016 + 1.7, z * 0.016 + 3.2, 3) * 2 - 1);
-  h += ridge * 12;
+  h += fbm(x * 0.009, z * 0.009, 4) * 26;
+  h += fbm(x * 0.038 + 5.3, z * 0.038 + 9.1, 3) * 7;
+  const ridge = 1 - Math.abs(fbm(x * 0.014 + 1.7, z * 0.014 + 3.2, 3) * 2 - 1);
+  h += ridge * 13;
+  // valley carve
+  const valley = Math.abs(noise(x * 0.004 + 99, z * 0.004 + 77) * 2 - 1);
+  h -= Math.pow(valley, 4) * 14;
   return h;
 }
 
 // ============================================================
-// TERRAIN
+// TERRAIN — triplanar-ish blended material per chunk
 // ============================================================
 const CHUNK = 100;
-const SEG = 80;
-const TEX_SCALE = 0.18;
-
-const terrainMat = new THREE.MeshStandardMaterial({
-  roughness: 0.82,
-  metalness: 0.02,
-  flatShading: true,
-});
-
-const grassNormalMap = grassNormal;
-const rockNormalMap = rockNormal;
-const grassRoughMap = grassRoughness;
-const rockRoughMap = rockRoughness;
+const SEG = 90;
+const TEX_SCALE = 0.16;
 
 function buildChunkMesh(cx, cz) {
   const geom = new THREE.PlaneGeometry(CHUNK, CHUNK, SEG, SEG);
   geom.rotateX(-Math.PI / 2);
   const pos = geom.attributes.position;
   const colors = new Float32Array(pos.count * 3);
+  const ao = new Float32Array(pos.count);
   const roughness = new Float32Array(pos.count);
-  const texCoord = new Float32Array(pos.count * 2);
+  const uv = new Float32Array(pos.count * 2);
 
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i) + cx;
@@ -274,60 +254,102 @@ function buildChunkMesh(cx, cz) {
     let h = sampleHeight(x, z);
     pos.setY(i, h);
 
-    const t = (h - 0) / 45;
+    const t = Math.max(0, Math.min(1, (h - 1) / 42));
+    let col = new THREE.Color('#4f6632');
     let r = 0.85;
-    let g = new THREE.Color('#4f6632');
-    if (t > 0.35) { g.lerp(new THREE.Color('#6e8040'), (t - 0.35) / 0.2); r = 0.78; }
-    if (t > 0.55) { g.lerp(new THREE.Color('#9e9688'), (t - 0.55) / 0.2); r = 0.55; }
-    if (t > 0.72) { g.lerp(new THREE.Color('#7a7268'), (t - 0.72) / 0.15); r = 0.5; }
-    if (t > 0.88) { g.lerp(new THREE.Color('#e8ecf2'), (t - 0.88) / 0.12); r = 0.65; }
-    colors[i * 3] = g.r;
-    colors[i * 3 + 1] = g.g;
-    colors[i * 3 + 2] = g.b;
-    roughness[i] = r;
 
-    texCoord[i * 2] = (x * TEX_SCALE) % 1;
-    texCoord[i * 2 + 1] = (z * TEX_SCALE) % 1;
+    // biome blend inspired by real elevation bands
+    if (t > 0.3) col.lerp(new THREE.Color('#6e8040'), (t - 0.3) / 0.2);
+    if (t > 0.5) {
+      const m = (t - 0.5) / 0.25;
+      col.lerp(new THREE.Color('#8a7e6e'), m);
+      r = 0.6 - m * 0.1;
+    }
+    if (t > 0.65) {
+      const m = Math.min(1, (t - 0.65) / 0.2);
+      col.lerp(new THREE.Color('#7a7268'), m);
+      r = 0.45;
+    }
+    if (t > 0.82) {
+      const m = Math.min(1, (t - 0.82) / 0.18);
+      col.lerp(new THREE.Color('#e0e4ec'), m);
+      r = 0.7;
+    }
+
+    // slope darkening / AO approximation
+    const ridge = 1 - Math.abs(fbm(x * 0.016 + 1.7, z * 0.016 + 3.2, 3) * 2 - 1);
+    const slope = Math.abs(ridge);
+    col.multiplyScalar(1 - slope * 0.25);
+    ao[i] = 1 - slope * 0.4;
+    roughness[i] = r + slope * 0.15;
+
+    colors[i * 3] = col.r;
+    colors[i * 3 + 1] = col.g;
+    colors[i * 3 + 2] = col.b;
+    uv[i * 2] = (x * TEX_SCALE) % 1;
+    uv[i * 2 + 1] = (z * TEX_SCALE) % 1;
   }
   geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geom.setAttribute('ao', new THREE.BufferAttribute(ao, 1));
   geom.setAttribute('roughness', new THREE.BufferAttribute(roughness, 1));
-  geom.setAttribute('uv', new THREE.BufferAttribute(texCoord, 2));
+  geom.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   geom.computeVertexNormals();
 
-  const mat = terrainMat.clone();
-  mat.vertexColors = true;
+  const mat = new THREE.MeshStandardMaterial({
+    roughness: 0.8,
+    metalness: 0.02,
+    flatShading: true,
+    vertexColors: true,
+  });
+  mat.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <common>',
+      `#include <common>
+      varying float vAO;
+      varying float vRough;`
+    );
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <lights_physical_fragment>',
+      `#include <lights_physical_fragment>
+      rough = clamp(rough + vRough * 0.35, 0.28, 0.95);`
+    );
+  };
+
   return new THREE.Mesh(geom, mat);
 }
 
 // ============================================================
 // WATER
 // ============================================================
-const waterGeom = new THREE.PlaneGeometry(CHUNK * 4, CHUNK * 4);
+const waterGeom = new THREE.PlaneGeometry(CHUNK * 5, CHUNK * 5);
 waterGeom.rotateX(-Math.PI / 2);
 const waterMat = new THREE.MeshPhysicalMaterial({
   color: '#3b5d72',
-  roughness: 0.05,
-  metalness: 0.1,
+  roughness: 0.02,
+  metalness: 0.08,
   transparent: true,
-  opacity: 0.72,
+  opacity: 0.7,
+  clearcoat: 0.2,
 });
 const water = new THREE.Mesh(waterGeom, waterMat);
-water.position.y = 2.0;
+water.position.y = 2.4;
 scene.add(water);
 
 // ============================================================
-// TREES (Instanced)
+// VEGETATION — elevation-aware, multi-species
 // ============================================================
-const trunkGeom = new THREE.CylinderGeometry(0.18, 0.28, 1.8, 6);
-const foliageGeom = new THREE.ConeGeometry(1.1, 2.8, 7, 1);
-const trunkMat = new THREE.MeshStandardMaterial({ color: '#4a3b2f', roughness: 0.9 });
+const trunkGeom = new THREE.CylinderGeometry(0.18, 0.3, 2.0, 6);
+const foliageGeom = new THREE.ConeGeometry(1.2, 3.2, 7, 1);
+const foliageAltGeom = new THREE.ConeGeometry(1.0, 2.6, 6, 1);
+const trunkMat = new THREE.MeshStandardMaterial({ color: '#4a3b2f', roughness: 0.92 });
 const foliageMats = [
-  new THREE.MeshStandardMaterial({ color: '#2f4025', roughness: 0.85 }),
-  new THREE.MeshStandardMaterial({ color: '#3a4f30', roughness: 0.85 }),
-  new THREE.MeshStandardMaterial({ color: '#263820', roughness: 0.88 }),
+  new THREE.MeshStandardMaterial({ color: '#2f4025', roughness: 0.88 }),
+  new THREE.MeshStandardMaterial({ color: '#3a4f30', roughness: 0.88 }),
+  new THREE.MeshStandardMaterial({ color: '#263820', roughness: 0.9 }),
+  new THREE.MeshStandardMaterial({ color: '#4a5a3a', roughness: 0.86 }),
 ];
 
-const MAX_TREES = 6000;
+const MAX_TREES = 8000;
 const trunkInstanced = new THREE.InstancedMesh(trunkGeom, trunkMat, MAX_TREES);
 const foliageInstanced = new THREE.InstancedMesh(foliageGeom, foliageMats[0], MAX_TREES * 2);
 trunkInstanced.castShadow = false;
@@ -340,40 +362,77 @@ const treeData = [];
 
 function addTree(x, z) {
   const h = sampleHeight(x, z);
-  if (h < 3.0 || h > 24) return;
-  const s = 0.7 + Math.random() * 1.3;
-  dummy.position.set(x, h, z);
-  dummy.scale.setScalar(s);
-  dummy.rotation.y = Math.random() * Math.PI * 2;
-  dummy.updateMatrix();
-  treeData.push({ x, z, h, s, rot: dummy.rotation.y });
+  if (h < 2.8 || h > 26) return;
+  const s = 0.65 + Math.random() * 1.35;
+  const rot = Math.random() * Math.PI * 2;
+  const matIdx = Math.floor(Math.random() * foliageMats.length);
+  const wide = Math.random() > 0.55;
+  treeData.push({ x, z, h, s, rot, matIdx, wide });
 }
 
 function buildInstancedTrees() {
-  let trunkIdx = 0, foliageIdx = 0;
+  let ti = 0, fi = 0;
   for (const t of treeData) {
-    if (trunkIdx >= MAX_TREES) break;
+    if (ti >= MAX_TREES) break;
     dummy.position.set(t.x, t.h, t.z);
     dummy.scale.setScalar(t.s);
     dummy.rotation.y = t.rot;
     dummy.updateMatrix();
-    trunkInstanced.setMatrixAt(trunkIdx++, dummy.matrix);
-    dummy.position.set(t.x, t.h + 0.9, t.z);
+    trunkInstanced.setMatrixAt(ti++, dummy.matrix);
+    dummy.position.set(t.x, t.h + 1.0, t.z);
     dummy.scale.setScalar(t.s);
     dummy.rotation.y = t.rot;
     dummy.updateMatrix();
-    foliageInstanced.setMatrixAt(foliageIdx++, dummy.matrix);
-    dummy.position.set(t.x, t.h + 2.2, t.z);
-    dummy.scale.setScalar(t.s * 0.7);
-    dummy.rotation.y = t.rot + 0.4;
+    foliageInstanced.setMatrixAt(fi++, dummy.matrix);
+    dummy.position.set(t.x, t.h + 2.5, t.z);
+    dummy.scale.setScalar(t.wide ? t.s * 0.85 : t.s * 0.65);
+    dummy.rotation.y = t.rot + 0.35;
     dummy.updateMatrix();
-    foliageInstanced.setMatrixAt(foliageIdx++, dummy.matrix);
+    foliageInstanced.setMatrixAt(fi++, dummy.matrix);
   }
-  trunkInstanced.count = trunkIdx;
+  trunkInstanced.count = ti;
   trunkInstanced.instanceMatrix.needsUpdate = true;
-  foliageInstanced.count = foliageIdx;
+  foliageInstanced.count = fi;
   foliageInstanced.instanceMatrix.needsUpdate = true;
-  foliageInstanced.material = foliageMats[Math.floor(Math.random() * foliageMats.length)];
+}
+
+// ============================================================
+// GROUND COVER — rocks and low bushes (instanced)
+// ============================================================
+const rockGeom = new THREE.DodecahedronGeometry(0.35, 0);
+const rockMat = new THREE.MeshStandardMaterial({ color: '#6e685f', roughness: 0.75, flatShading: true });
+const rockInstanced = new THREE.InstancedMesh(rockGeom, rockMat, 4000);
+scene.add(rockInstanced);
+
+const bushGeom = new THREE.SphereGeometry(0.4, 5, 4);
+const bushMat = new THREE.MeshStandardMaterial({ color: '#3a4f30', roughness: 0.9, flatShading: true });
+const bushInstanced = new THREE.InstancedMesh(bushGeom, bushMat, 3000);
+scene.add(bushInstanced);
+
+const groundData = [];
+function addGround(x, z) {
+  const h = sampleHeight(x, z);
+  if (h < 3.2 || h > 23) return;
+  if (Math.random() > 0.35) return;
+  const s = 0.6 + Math.random() * 1.6;
+  const rot = Math.random() * Math.PI * 2;
+  groundData.push({ x, z, h, s, rot, rock: Math.random() > 0.45 });
+}
+function buildGround() {
+  let ri = 0, bi = 0;
+  const dm = dummy;
+  for (const g of groundData) {
+    dm.position.set(g.x, g.h + (g.rock ? 0.08 : 0.18), g.z);
+    dm.scale.setScalar(g.s);
+    dm.rotation.set(g.rock ? 0 : 1.2, g.rot, g.rock ? g.rot : 0);
+    dm.updateMatrix();
+    if (g.rock && ri < 4000) rockInstanced.setMatrixAt(ri++, dm.matrix);
+    else if (!g.rock && bi < 3000) bushInstanced.setMatrixAt(bi++, dm.matrix);
+  }
+  rockInstanced.count = ri;
+  rockInstanced.instanceMatrix.needsUpdate = true;
+  bushInstanced.count = bi;
+  bushInstanced.instanceMatrix.needsUpdate = true;
 }
 
 // ============================================================
@@ -381,10 +440,7 @@ function buildInstancedTrees() {
 // ============================================================
 const CHUNKS_RADIUS = 2;
 const chunks = new Map();
-const treeChunks = new Map();
-
 function chunkKey(cx, cz) { return `${cx},${cz}`; }
-
 function ensureChunk(cx, cz) {
   const key = chunkKey(cx, cz);
   if (chunks.has(key)) return;
@@ -392,18 +448,17 @@ function ensureChunk(cx, cz) {
   scene.add(mesh);
   chunks.set(key, mesh);
 
-  // scatter trees
   const step = 7;
   for (let lx = -CHUNK / 2; lx < CHUNK / 2; lx += step) {
     for (let lz = -CHUNK / 2; lz < CHUNK / 2; lz += step) {
-      if (Math.random() > 0.6) continue;
+      if (Math.random() > 0.62) continue;
       const wx = cx * CHUNK + lx + (Math.random() - 0.5) * step;
       const wz = cz * CHUNK + lz + (Math.random() - 0.5) * step;
       addTree(wx, wz);
+      addGround(wx, wz);
     }
   }
 }
-
 function removeChunk(cx, cz) {
   const key = chunkKey(cx, cz);
   const mesh = chunks.get(key);
@@ -416,47 +471,34 @@ function removeChunk(cx, cz) {
 
 for (let x = -CHUNKS_RADIUS; x <= CHUNKS_RADIUS; x++)
   for (let z = -CHUNKS_RADIUS; z <= CHUNKS_RADIUS; z++) ensureChunk(x, z);
-
 buildInstancedTrees();
+buildGround();
 
 // ============================================================
-// STATE
+// WALK STATE
 // ============================================================
-const state = {
-  speed: 4.2,
-  distance: 0,
-  yaw: 0,
-  pitch: 0.35,
-  bob: 0,
-  sway: 0,
-};
-
+const state = { speed: 4.0, distance: 0, yaw: 0, pitch: 0.38, bob: 0, sway: 0 };
 let dragging = false;
 let prevMouse = { x: 0, y: 0 };
 canvas.addEventListener('pointerdown', (e) => { dragging = true; prevMouse.x = e.clientX; prevMouse.y = e.clientY; canvas.setPointerCapture(e.pointerId); });
 window.addEventListener('pointerup', () => { dragging = false; });
 window.addEventListener('pointermove', (e) => {
   if (!dragging) return;
-  const dx = e.clientX - prevMouse.x;
-  const dy = e.clientY - prevMouse.y;
-  state.yaw -= dx * 0.004;
-  state.pitch -= dy * 0.004;
-  state.pitch = Math.max(-0.35, Math.min(1.2, state.pitch));
-  prevMouse.x = e.clientX;
-  prevMouse.y = e.clientY;
+  state.yaw -= (e.clientX - prevMouse.x) * 0.004;
+  state.pitch -= (e.clientY - prevMouse.y) * 0.004;
+  state.pitch = Math.max(-0.3, Math.min(1.2, state.pitch));
+  prevMouse.x = e.clientX; prevMouse.y = e.clientY;
 });
 window.addEventListener('wheel', (e) => {
   state.speed *= e.deltaY < 0 ? 1.08 : 0.92;
-  state.speed = Math.max(1.0, Math.min(20, state.speed));
-  paceEl.textContent = (state.speed / 4.2).toFixed(1) + 'x';
+  state.speed = Math.max(1.0, Math.min(22, state.speed));
+  paceEl.textContent = (state.speed / 4.0).toFixed(1) + 'x';
 }, { passive: true });
 
 // ============================================================
-// ANIMATION
+// LOOP
 // ============================================================
 const clock = new THREE.Clock();
-let builtOnce = false;
-
 function tick() {
   const dt = Math.min(clock.getDelta(), 0.1);
   const forward = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(0, state.yaw, 0));
@@ -464,12 +506,11 @@ function tick() {
   state.distance += state.speed * dt;
 
   const ground = sampleHeight(camera.position.x, camera.position.z);
-  const targetY = ground + 2.6;
-  camera.position.y += (targetY - camera.position.y) * Math.min(dt * 3.2, 1);
-
-  state.bob += dt * state.speed * 1.4;
-  const bobY = Math.sin(state.bob) * 0.18;
-  const swayX = Math.cos(state.bob * 0.7) * 0.06;
+  const targetY = ground + 2.7;
+  camera.position.y += (targetY - camera.position.y) * Math.min(dt * 3.4, 1);
+  state.bob += dt * state.speed * 1.35;
+  const bobY = Math.sin(state.bob) * 0.2;
+  const swayX = Math.cos(state.bob * 0.65) * 0.07;
   state.sway += (swayX - state.sway) * Math.min(dt * 8, 1);
   camera.position.y += bobY;
   camera.position.x += state.sway;
@@ -480,7 +521,7 @@ function tick() {
 
   water.position.x = camera.position.x;
   water.position.z = camera.position.z;
-  water.material.opacity = 0.68 + Math.sin(clock.elapsedTime * 0.6) * 0.04;
+  waterMat.opacity = 0.66 + Math.sin(clock.elapsedTime * 0.55) * 0.04;
 
   const cx = Math.round(camera.position.x / CHUNK);
   const cz = Math.round(camera.position.z / CHUNK);
@@ -490,23 +531,16 @@ function tick() {
       desired.add(chunkKey(x, z));
       ensureChunk(x, z);
     }
-  for (const [key] of chunks) {
-    if (!desired.has(key)) removeChunk(...key.split(',').map(Number));
-  }
+  for (const [key] of chunks) if (!desired.has(key)) removeChunk(...key.split(',').map(Number));
 
   distEl.textContent = (state.distance / 1000).toFixed(2);
   elevEl.textContent = Math.round(camera.position.y * 10) / 10;
-
   renderer.render(scene, camera);
   requestAnimationFrame(tick);
 }
 
-// ============================================================
-// INIT
-// ============================================================
 loading.classList.add('hidden');
 tick();
-
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
