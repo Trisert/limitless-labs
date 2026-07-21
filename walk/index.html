@@ -853,7 +853,8 @@ function tick() {
 
   distEl.textContent = (state.distance / 1000).toFixed(2);
   elevEl.textContent = Math.round(ground * 10) / 10;
-  const slope = 1.0 - Math.abs(getHeight(new THREE.Vector2(camera.position.x, camera.position.z))[0] ?? 0);
+  const hAhead = sampleHeightJS(camera.position.x + 1, camera.position.z);
+  const slope = Math.min(Math.abs(hAhead - ground) / 3.0, 1.0);
   biomeEl.textContent = classifyBiome(ground, Math.max(0, 1 - sampleHeightJS(camera.position.x+1, camera.position.z)));
 
   terrainMaterial.uniforms.uTime.value = time;
