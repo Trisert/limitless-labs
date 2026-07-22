@@ -8,10 +8,6 @@
 <style id="walk-inline-css">
   html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#0b0d0f}
   #walk-canvas{position:fixed;inset:0;display:block;width:100%;height:100%;}
-  .walk-ui{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);display:flex;gap:12px;z-index:10}
-  .walk-chip{background:rgba(11,13,15,.55);border:1px solid rgba(224,167,67,.25);color:#e6e6e6;padding:10px 14px;border-radius:999px;backdrop-filter:blur(6px);font:14px/1.2 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
-  .walk-chip .accent{color:#e0a743}
-  .walk-hint{position:fixed;left:50%;top:16px;transform:translateX(-50%);color:#cfd3d6;background:rgba(11,13,15,.45);border:1px solid rgba(224,167,67,.18);padding:8px 12px;border-radius:10px;backdrop-filter:blur(6px);font:12px/1.3 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;z-index:10;opacity:.9}
   .loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0b0d0f;color:#e0a743;font:14px/1.2 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;z-index:20;transition:opacity .8s}
   .loading.hidden{opacity:0;pointer-events:none}
 </style>
@@ -19,13 +15,6 @@
 <body>
 <canvas id="walk-canvas" aria-label="Procedural infinite walk through a national park landscape"></canvas>
 <div class="loading" id="loading">GENERATING WORLD...</div>
-<div class="walk-hint">Click &amp; drag to look · Walk automatically · Scroll to adjust pace</div>
-<div class="walk-ui">
-  <div class="walk-chip">PACE <span class="accent" id="pace">1.0x</span></div>
-  <div class="walk-chip">DIST <span class="accent" id="dist">0.00</span> <span style="opacity:.7">km</span></div>
-  <div class="walk-chip">ELEV <span class="accent" id="elev">0</span> <span style="opacity:.7">m</span></div>
-  <div class="walk-chip">BIOME <span class="accent" id="biome">—</span></div>
-</div>
 
 <script type="importmap">
 { "imports": { "three": "../vendor/three.module.js" } }
@@ -35,10 +24,6 @@ import * as THREE from 'three';
 
 const canvas = document.getElementById('walk-canvas');
 const loading = document.getElementById('loading');
-const paceEl = document.getElementById('pace');
-const distEl = document.getElementById('dist');
-const elevEl = document.getElementById('elev');
-const biomeEl = document.getElementById('biome');
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
 if (!renderer.capabilities.isWebGL2) {
@@ -53,9 +38,8 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.onerror = (e) => { console.error('WebGL error:', e); loading.textContent = 'RENDER ERROR — refresh'; };
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1.0, 1200);
-camera.position.set(0, 4.2, 0);
-const sunDir = new THREE.Vector3(200, 120, -90).normalize();
+const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
+camera.position.set(0, 0, 1);
 
 // ============================================================
 // SHADER — fullscreen quad with raymarching
@@ -77,10 +61,8 @@ const fragmentShader = `
 varying vec2 vUv;
 uniform vec3 uCameraPos;
 uniform vec3 uCameraDir;
-uniform vec3 uCameraUp;
 uniform float uTime;
 uniform vec2 uResolution;
-uniform float uSpeed;
 
 // iq's value noise with analytical derivatives
 vec3 noised(vec2 x) {
@@ -137,7 +119,6 @@ float map(vec3 pos, out vec2 d) {
 
 vec3 calcNormal(vec3 pos) {
   vec2 d;
-  vec2 e = vec2(0.5, -0.5);
   float r = 0.5;
   vec3 n = vec3(
     map(pos + vec3(r,0,0), d) - map(pos + vec3(-r,0,0), d),
@@ -264,12 +245,10 @@ const material = new THREE.ShaderMaterial({
   vertexShader,
   fragmentShader,
   uniforms: {
-    uCameraPos: { value: camera.position.clone() },
+    uCameraPos: { value: new THREE.Vector3(0, 5.0, 0) },
     uCameraDir: { value: new THREE.Vector3(0, 0, -1) },
-    uCameraUp: { value: new THREE.Vector3(0, 1, 0) },
     uTime: { value: 0 },
     uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
-    uSpeed: { value: 1.0 },
   },
   side: THREE.DoubleSide,
 });
@@ -278,118 +257,22 @@ const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material);
 scene.add(quad);
 
 // ============================================================
-// WALK STATE
+// LOOP — static view, just animate time
 // ============================================================
-const state = { speed: 4.2, distance: 0, yaw: 0, pitch: 0.42, bob: 0, sway: 0 };
+const clock = new THREE.Clock();
+function tick() {
+  material.uniforms.uTime.value = clock.elapsedTime;
+  renderer.render(scene, camera);
+  requestAnimationFrame(tick);
+}
 
-// ============================================================
-// STARTUP
-// ============================================================
 requestAnimationFrame(() => {
   loading.classList.add('hidden');
   tick();
 });
 setTimeout(() => loading.classList.add('hidden'), 4000);
 
-let dragging = false;
-let prevMouse = { x: 0, y: 0 };
-canvas.addEventListener('pointerdown', (e) => { dragging = true; prevMouse.x = e.clientX; prevMouse.y = e.clientY; canvas.setPointerCapture(e.pointerId); });
-window.addEventListener('pointerup', () => { dragging = false; });
-window.addEventListener('pointermove', (e) => {
-  if (!dragging) return;
-  state.yaw -= (e.clientX - prevMouse.x) * 0.004;
-  state.pitch -= (e.clientY - prevMouse.y) * 0.004;
-  state.pitch = Math.max(-0.25, Math.min(1.25, state.pitch));
-  prevMouse.x = e.clientX; prevMouse.y = e.clientY;
-});
-window.addEventListener('wheel', (e) => {
-  state.speed *= e.deltaY < 0 ? 1.08 : 0.92;
-  state.speed = Math.max(1.0, Math.min(24, state.speed));
-  paceEl.textContent = (state.speed / 4.2).toFixed(1) + 'x';
-  material.uniforms.uSpeed.value = state.speed / 4.2;
-}, { passive: true });
-
-// Biome classification
-const BIOME_NAMES = ['river valley', 'lowland meadow', 'mixed forest', 'high grass', 'rocky ridge', 'alpine snow'];
-function classifyBiome(h, slope) {
-  if (h > 80 && slope < 0.25) return 'alpine snow';
-  if (h > 60) return 'rocky ridge';
-  if (h > 40 && slope < 0.35) return 'high grass';
-  if (slope > 0.6) return 'rocky ridge';
-  if (h < 15) return 'river valley';
-  return 'mixed forest';
-}
-
-// ============================================================
-// LOOP
-// ============================================================
-const clock = new THREE.Clock();
-function tick() {
-  const dt = Math.min(clock.getDelta(), 0.1);
-  const time = clock.elapsedTime;
-
-  const fwd = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(0, state.yaw, 0));
-  camera.position.addScaledVector(fwd, state.speed * dt);
-  state.distance += state.speed * dt;
-
-  // Get terrain height at camera position
-  const camX = camera.position.x;
-  const camZ = camera.position.z;
-
-  // Sample height using the same terrain function
-  const m2 = [1.6, -1.2, 1.2, 1.6];
-  const noised = (px, pz) => {
-    const p = [Math.floor(px), Math.floor(pz)];
-    const f = [px - p[0], pz - p[1]];
-    const u = [f[0]*f[0]*(3-2*f[0]), f[1]*f[1]*(3-2*f[1])];
-    const n = p[0] + p[1]*57;
-    const a = Math.sin(n+0)*43758.5453123, b = Math.sin(n+1)*43758.5453123;
-    const c = Math.sin(n+57)*43758.5453123, d = Math.sin(n+58)*43758.5453123;
-    const va = a - Math.floor(a), vb = b - Math.floor(b);
-    const vc = c - Math.floor(c), vd = d - Math.floor(d);
-    return va + (vb-va)*u[0] + (vc-va)*u[1] + (va-vb-vc+vd)*u[0]*u[1];
-  };
-  const terrainJS = (px, pz) => {
-    let p = [px*0.003, pz*0.003];
-    let a = 0, b = 1;
-    let dx = 0, dz = 0;
-    for(let i=0; i<6; i++) {
-      const n = noised(p[0], p[1]);
-      // Accumulate derivatives like the GLSL shader
-      dx += 0; dz += 0; // JS noised doesn't return derivatives, use simplified
-      a += b*n/(1.0);
-      b *= 0.5;
-      const np = [m2[0]*p[0] + m2[1]*p[1], m2[2]*p[0] + m2[3]*p[1]];
-      p = np;
-    }
-    return 140.0*a;
-  };
-  const ground = terrainJS(camX, camZ);
-  const targetY = ground + 3.3;
-  camera.position.y += (targetY - camera.position.y) * Math.min(dt * 4.0, 1);
-
-  state.yaw += Math.sin(time * 0.25) * dt * 0.03;
-
-  // Update shader uniforms
-  material.uniforms.uCameraPos.value.copy(camera.position);
-  const dir = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(state.pitch, 0, 0)).applyEuler(new THREE.Euler(0, state.yaw, 0));
-  material.uniforms.uCameraDir.value.copy(dir);
-  material.uniforms.uTime.value = time;
-
-  // Update UI
-  distEl.textContent = (state.distance / 1000).toFixed(2);
-  elevEl.textContent = Math.round(ground);
-  const hAhead = terrainJS(camera.position.x + 1, camera.position.z);
-  const slope = Math.min(Math.abs(hAhead - ground) / 3.0, 1.0);
-  biomeEl.textContent = classifyBiome(ground, Math.max(0, 1 - slope));
-
-  renderer.render(scene, camera);
-  requestAnimationFrame(tick);
-}
-
 window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
   material.uniforms.uResolution.value.set(window.innerWidth, window.innerHeight);
 });
