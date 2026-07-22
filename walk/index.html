@@ -4,10 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Walk — Limitless Labs</title>
+<link rel="icon" href="/limitless-labs/favicon.ico" type="image/x-icon">
 <link rel="stylesheet" href="/limitless-labs/style.css?v=3">
 <style id="walk-inline-css">
   html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#0b0d0f}
-  #walk-canvas{position:fixed;inset:0;display:block;width:100%;height:100%;}
+  #walk-canvas{position:fixed;inset:0;display:block;width:100%;height:100%;opacity:0;transition:opacity .3s}
+  #walk-canvas.ready{opacity:1}
   .loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0b0d0f;color:#e0a743;font:14px/1.2 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;z-index:20;transition:opacity .8s}
   .loading.hidden{opacity:0;pointer-events:none}
 </style>
@@ -268,6 +270,7 @@ function tick() {
 }
 
 requestAnimationFrame(() => {
+  canvas.classList.add('ready');
   loading.classList.add('hidden');
   tick();
 });
