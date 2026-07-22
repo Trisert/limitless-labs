@@ -325,7 +325,15 @@ void main() {
   xy.x *= uResolution.x / uResolution.y;
 
   vec3 ro = uCameraPos;
-  vec3 ta = uCameraPos + uCameraDir;
+  // Fallback if uniform is undefined
+  if (ro.x == 0.0 && ro.y == 0.0 && ro.z == 0.0) {
+    ro = vec3(0.0, 40.0, 40.0);
+  }
+  vec3 ta = ro + uCameraDir;
+  // Fallback if direction is undefined
+  if (uCameraDir.x == 0.0 && uCameraDir.y == 0.0 && uCameraDir.z == 0.0) {
+    ta = vec3(0.0, 0.0, 0.0);
+  }
 
   vec3 cw = normalize(ta - ro);
   vec3 cp = vec3(0.0, 1.0, 0.0);
