@@ -41,7 +41,9 @@ renderer.onerror = (e) => { console.error('WebGL error:', e); loading.textConten
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1.0, 1200);
-camera.position.set(0, 85, 90);
+camera.position.set(0, 40, 40);
+camera.lookAt(0, 0, 0);
+camera.updateMatrixWorld();
 
 // ============================================================
 // SHADER — fullscreen quad with raymarching
@@ -333,6 +335,7 @@ void main() {
   vec3 col;
   float distance;
   if(!Scene(ro, rd, distance, vUv * uResolution)) {
+    // Sky background
     col = GetSky(rd);
     col = GetClouds(col, rd);
   } else {
@@ -345,7 +348,8 @@ void main() {
     col = TerrainColour(pos, nor, distance);
   }
 
-  col = PostEffects(col, xy);
+  // Post-effects (tone mapping)
+  col = (1.0 - exp(-col * 6.0)) * 1.0024;
   gl_FragColor = vec4(col, 1.0);
 }
 `;
@@ -354,8 +358,8 @@ const material = new THREE.ShaderMaterial({
   vertexShader,
   fragmentShader,
   uniforms: {
-    uCameraPos: { value: new THREE.Vector3(0, 5.0, 0) },
-    uCameraDir: { value: new THREE.Vector3(0, 0, -1) },
+    uCameraPos: { value: new THREE.Vector3(0, 40.0, 40) },
+    uCameraDir: { value: new THREE.Vector3(0, -0.5, -1).normalize() },
     uTime: { value: 0 },
     uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
   },
