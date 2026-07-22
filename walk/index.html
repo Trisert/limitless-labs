@@ -676,24 +676,44 @@ function makeTreeSprite() {
   const ctx = c.getContext('2d');
   const img = ctx.createImageData(size, size);
   const d = img.data;
+  // Pre-generate a few noise offsets for variety
+  const noiseSeed = Math.random() * 100;
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const i = (y * size + x) * 4;
       const u = x / size, v = y / size;
-      // tree silhouette: trunk + canopy
-      const trunkW = 0.08, trunkH = 0.35;
-      const inTrunk = (u > 0.5 - trunkW && u < 0.5 + trunkW && v > 0.55 && v < 0.92);
-      // canopy: circle with noise
-      const dx = u - 0.5, dy = v - 0.45;
+      // trunk: irregular vertical strip
+      const trunkW = 0.06 + valueNoise(u*2+noiseSeed, v*2+noiseSeed, 1) * 0.03;
+      const inTrunk = (u > 0.5 - trunkW && u < 0.5 + trunkW && v > 0.58 && v < 0.93);
+      // canopy: layered irregular shape (3 overlapping circles)
+      const dx = u - 0.5, dy = v - 0.42;
       const dist = Math.sqrt(dx*dx + dy*dy);
-      const canopySize = 0.32 + valueNoise(u*5, v*5, 2) * 0.05;
-      const inCanopy = dist < canopySize;
+      // irregular canopy boundary using noise
+      const boundaryNoise = valueNoise(u*6+noiseSeed, v*6+noiseSeed, 2) * 0.12;
+      const canopyRadius = 0.34 + boundaryNoise;
+      const inCanopy = dist < canopyRadius;
+      // shadow under tree
+      const shadowDx = u - 0.5, shadowDy = v - 0.55;
+      const shadowDist = Math.sqrt(shadowDx*shadowDx + shadowDy*shadowDy);
+      const inShadow = shadowDist < 0.38 && v > 0.55 && v < 0.85;
       if (inTrunk) {
-        d[i] = 80; d[i+1] = 55; d[i+2] = 35; d[i+3] = 255;
+        const n = valueNoise(u*10+noiseSeed, v*10+noiseSeed, 1);
+        const shade = 0.6 + n * 0.4;
+        d[i] = Math.floor(70 * shade); d[i+1] = Math.floor(45 * shade); d[i+2] = Math.floor(30 * shade); d[i+3] = 255;
       } else if (inCanopy) {
-        const n = valueNoise(u*8, v*8, 2);
-        const shade = 0.7 + n * 0.3;
-        d[i] = Math.floor(35 * shade); d[i+1] = Math.floor(80 * shade); d[i+2] = Math.floor(35 * shade); d[i+3] = 255;
+        // layered green with noise variation
+        const n = valueNoise(u*12+noiseSeed, v*12+noiseSeed, 2);
+        const n2 = valueNoise(u*25+noiseSeed, v*25+noiseSeed, 1);
+        const shade = 0.65 + n * 0.35;
+        const detail = n2 * 0.15;
+        // darker at top, lighter at bottom (sunlit bottom)
+        const verticalGrad = 1.0 - (v - 0.1) * 0.3;
+        d[i] = Math.floor((35 + detail*20) * shade * verticalGrad);
+        d[i+1] = Math.floor((80 + detail*30) * shade * verticalGrad);
+        d[i+2] = Math.floor((35 + detail*15) * shade * verticalGrad);
+        d[i+3] = 255;
+      } else if (inShadow) {
+        d[i] = 20; d[i+1] = 15; d[i+2] = 10; d[i+3] = 80;
       } else {
         d[i] = 0; d[i+1] = 0; d[i+2] = 0; d[i+3] = 0;
       }
@@ -706,8 +726,15 @@ function makeTreeSprite() {
   tex.generateMipmaps = false;
   return tex;
 }
-const treeSpriteTex = makeTreeSprite();
-const treeSpriteMat = new THREE.SpriteMaterial({ map: treeSpriteTex, transparent: true, depthWrite: false });
+// Generate multiple tree sprite variants for variety
+const treeSpriteVariants = [
+  makeTreeSprite(),
+  makeTreeSprite(),
+  makeTreeSprite(),
+];
+const treeSpriteMats = treeSpriteVariants.map(tex =>
+  new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false })
+);
 const treeSprites = [];
 const MAX_SPRITES = 2000;
 const spritePool = [];
@@ -734,13 +761,15 @@ function addTree(x, z) {
   const h = sampleHeightJS(x, z);
   if (h < 3.8 || h > 28) return;
   const s = 0.6 + Math.random() * 1.6;
-  treeSprites.push({ x, z, h, s });
+  const variant = Math.floor(Math.random() * treeSpriteMats.length);
+  treeSprites.push({ x, z, h, s, variant });
 }
 function buildInstancedTrees() {
   for (const t of treeSprites) {
     if (treeSprites.length >= MAX_SPRITES) break;
     let sprite = spritePool.pop();
-    if (!sprite) sprite = new THREE.Sprite(treeSpriteMat);
+    if (!sprite) sprite = new THREE.Sprite(treeSpriteMats[t.variant]);
+    sprite.material = treeSpriteMats[t.variant];
     sprite.position.set(t.x, t.h, t.z);
     sprite.scale.setScalar(t.s * 4);
     sprite.renderOrder = 1;
