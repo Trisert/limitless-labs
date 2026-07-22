@@ -364,20 +364,26 @@ scene.add(quad);
 // ============================================================
 // LOOP — eagle flight over mountains and water
 // ============================================================
-const clock = new THREE.Clock();
 
 // Eagle flight path parameters
 const eagle = {
   t: 0,
-  speed: 0.05,  // Increased for visible movement
+  speed: 0.05,
   waveAmp: 45,
   waveAmp2: 20,
 };
 
+let lastTime = performance.now();
+let totalTime = 0;
+
 function tick() {
   try {
-    const time = clock.elapsedTime;
-    console.log('tick:', time.toFixed(3));
+    const now = performance.now();
+    const delta = (now - lastTime) / 1000;
+    lastTime = now;
+    totalTime += delta;
+    
+    const time = totalTime;
     eagle.t = time * eagle.speed;
     const t = eagle.t;
     
