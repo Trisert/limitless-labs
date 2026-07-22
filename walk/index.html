@@ -321,7 +321,13 @@ vec3 PostEffects(vec3 rgb, vec2 uv) {
 }
 
 void main() {
-  vec2 xy = vUv * 2.0 - 1.0;
+  // Ensure vUv is valid
+  vec2 uv = vUv;
+  if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+    uv = vec2(0.5, 0.5);
+  }
+  
+  vec2 xy = uv * 2.0 - 1.0;
   xy.x *= uResolution.x / uResolution.y;
 
   vec3 ro = uCameraPos;
