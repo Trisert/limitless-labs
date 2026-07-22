@@ -365,18 +365,10 @@ const quad = new THREE.Mesh(geo, material);
 scene.add(quad);
 
 // ============================================================
-// LOOP — eagle flight over mountains and water
+// LOOP — eagle flight over terrain
 // ============================================================
 
-// Eagle flight path parameters — Lissajous-style curve
-const eagle = {
-  t: 0,
-  speed: 0.03,
-  scaleX: 180,
-  scaleZ: 180,
-};
-
-// Replicate Hoskins' Terrain function in JS for height sampling
+// Terrain height sampling (Hoskins' noise replicated in JS)
 const rot2D = [1.3623, 1.7531, -1.7131, 1.4623];
 function hash12(px, py) {
   let p3x = (px * 0.1031) % 1; if(p3x < 0) p3x += 1;
@@ -385,7 +377,7 @@ function hash12(px, py) {
   return d - Math.floor(d);
 }
 function noise2d(x, y) {
-  const ix = Math.floor(x), iy = Math.floor(y);
+  const ix = Math.floor(x)|0, iy = Math.floor(y)|0;
   const fx = x - ix, fy = y - iy;
   const ux = fx*fx*(3-2*fx), uy = fy*fy*(3-2*fy);
   const h1 = hash12(ix, iy);
@@ -406,53 +398,52 @@ function terrainJS(x, z) {
     const nz = rot2D[2]*px + rot2D[3]*pz;
     px = nx; pz = nz;
   }
-  const ff = noise2d(px*0.002, pz*0.002);
-  f += Math.pow(Math.abs(ff), 5.0) * 275 - 5.0;
+  f += Math.pow(Math.abs(noise2d(px*0.002, pz*0.002)), 5.0) * 275 - 5.0;
   return f;
 }
 
+// Camera path
+const pathRadius = 220;
+const pathSpeed = 0.008;
 let lastTime = performance.now();
 let totalTime = 0;
 
 function tick() {
   try {
     const now = performance.now();
-    const delta = (now - lastTime) / 1000;
+    totalTime += (now - lastTime) / 1000;
     lastTime = now;
-    totalTime += delta;
-    
-    const time = totalTime;
-    eagle.t = time * eagle.speed;
-    const t = eagle.t;
-    
-    // Lissajous-style flight path (smooth loops, avoids mountains)
-    const camX = eagle.scaleX * Math.sin(t * 1.3) * Math.cos(t * 0.7);
-    const camZ = eagle.scaleZ * Math.sin(t * 1.7) * Math.cos(t * 0.5);
-    
-    // Multi-point terrain sampling for smooth height following
-    let hSum = 0, wSum = 0;
-    for (let i = 0; i < 5; i++) {
-      const phase = i * 0.15;
-      const sx = camX + Math.sin(t * 0.5 + phase) * 30;
-      const sz = camZ + Math.cos(t * 0.5 + phase) * 30;
-      hSum += terrainJS(sx, sz) * (0.4 + 0.15 * i);
-      wSum += (0.4 + 0.15 * i);
+    const t = totalTime * pathSpeed;
+
+    // Wide gentle path — overlapping ellipses
+    const camX = pathRadius * Math.sin(t * 0.7) * Math.cos(t * 0.4);
+    const camZ = pathRadius * Math.sin(t * 0.9) * Math.cos(t * 0.3);
+
+    // Scan terrain heights in a ring around the path point
+    // Take the maximum to guarantee no clipping
+    let maxH = -100;
+    for (let i = 0; i < 8; i++) {
+      const angle = i * 0.785; // 45° increments
+      const sx = camX + Math.cos(angle) * 35;
+      const sz = camZ + Math.sin(angle) * 35;
+      const h = terrainJS(sx, sz);
+      if (h > maxH) maxH = h;
     }
-    const groundH = hSum / wSum;
-    const camY = Math.max(groundH + 25, 15);
-    
+    const camY = Math.max(maxH + 50, 30);
+
     // Look ahead along the path
-    const lT = t + 0.3;
-    const lX = eagle.scaleX * Math.sin(lT * 1.3) * Math.cos(lT * 0.7);
-    const lZ = eagle.scaleZ * Math.sin(lT * 1.7) * Math.cos(lT * 0.5);
-    
-    // Forward direction with terrain-following pitch
-    const forward = new THREE.Vector3(lX - camX, 0, lZ - camZ).normalize();
-    
+    const lT = (totalTime + 1.5) * pathSpeed;
+    const lX = pathRadius * Math.sin(lT * 0.7) * Math.cos(lT * 0.4);
+    const lZ = pathRadius * Math.sin(lT * 0.9) * Math.cos(lT * 0.3);
+
+    // Camera looks forward and slightly down (bird's eye)
+    const fwd = new THREE.Vector3(lX - camX, 0, lZ - camZ).normalize();
+    const dir = new THREE.Vector3(fwd.x, -0.25, fwd.z).normalize();
+
     material.uniforms.uCameraPos.value.set(camX, camY, camZ);
-    material.uniforms.uCameraDir.value.set(forward.x, -0.35, forward.z).normalize();
-    material.uniforms.uTime.value = time;
-    
+    material.uniforms.uCameraDir.value.copy(dir);
+    material.uniforms.uTime.value = totalTime;
+
     renderer.render(scene, camera);
     requestAnimationFrame(tick);
   } catch(e) {
