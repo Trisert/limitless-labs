@@ -349,17 +349,7 @@ void main() {
 }
 `;
 
-const material = new THREE.RawShaderMaterial({
-  vertexShader,
-  fragmentShader,
-  uniforms: {
-    uCameraPos: { value: new THREE.Vector3(0, 40.0, 40) },
-    uCameraDir: { value: new THREE.Vector3(0, -0.3, -1).normalize() },
-    uTime: { value: 0 },
-    uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
-  },
-  side: THREE.DoubleSide,
-});
+const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
 
 const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material);
 scene.add(quad);
@@ -415,10 +405,7 @@ function tick() {
     // Forward direction for shader
     const forward = new THREE.Vector3(lookX - camX, 0 - currentY, lookZ - camZ).normalize();
     
-    material.uniforms.uCameraPos.value.set(camX, currentY, camZ);
-    material.uniforms.uCameraDir.value.copy(forward);
-    material.uniforms.uTime.value = time;
-    
+    // No uniforms needed for MeshBasicMaterial
     renderer.render(scene, camera);
     requestAnimationFrame(tick);
   } catch(e) {
