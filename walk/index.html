@@ -366,26 +366,106 @@ const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material);
 scene.add(quad);
 
 // ============================================================
-// LOOP — birdeye camera with smooth orbit
+// LOOP — eagle flight over mountains and water
 // ============================================================
 const clock = new THREE.Clock();
-const birdState = { angle: 0, radius: 90, height: 85, speed: 0.02 };
+
+// Eagle flight path parameters
+const eagle = {
+  t: 0,
+  speed: 0.015,
+  // Wave parameters for natural flight path
+  waveAmp: 45,
+  waveFreq: 0.3,
+  waveAmpY: 25,
+  waveFreqY: 0.15,
+  // Secondary wave for variation
+  waveAmp2: 20,
+  waveFreq2: 0.55,
+  waveAmpY2: 12,
+  waveFreqY2: 0.28,
+};
+
+// Replicate Hoskins' Terrain function in JS for height sampling
+const rotate2D = [1.3623, 1.7531, -1.7131, 1.4623];
+function hash12(p) {
+  const p3 = [fract(p.x * 0.1031), fract(p.y * 0.1031), fract((p.x + p.y) * 0.1031)];
+  const dot = p3[0] * p3[1] + p3[1] * p3[2] + p3[2] * p3[0] + 19.19 * (p3[0] + p3[1] + p3[2]);
+  return fract((p3[0] + p3[1]) * p3[2] * dot);
+}
+function fract(x) { return x - Math.floor(x); }
+function noise2d(x, z) {
+  const p = [Math.floor(x), Math.floor(z)];
+  const f = [x - p[0], z - p[1]];
+  const f2 = [f[0]*f[0]*(3-2*f[0]), f[1]*f[1]*(3-2*f[1])];
+  const add = [1, 0];
+  const h1 = hash12([p[0], p[1]]);
+  const h2 = hash12([p[0]+add[0], p[1]+add[1]]);
+  const h3 = hash12([p[0]+add[1], p[1]+add[0]]);
+  const h4 = hash12([p[0]+add[0], p[1]+add[0]]);
+  return lerp(lerp(h1, h2, f2[0]), lerp(h3, h4, f2[0]), f2[1]);
+}
+function lerp(a, b, t) { return a + (b - a) * t; }
+function terrainJS(x, z) {
+  let pos = [x * 0.05, z * 0.05];
+  let w = (noise2d(pos[0]*0.25, pos[1]*0.25) * 0.75 + 0.15);
+  w = 66.0 * w * w;
+  let f = 0.0;
+  for (let i = 0; i < 5; i++) {
+    f += w * noise2d(pos[0], pos[1]);
+    w = -w * 0.4;
+    const nx = rotate2D[0]*pos[0] + rotate2D[1]*pos[1];
+    const nz = rotate2D[2]*pos[0] + rotate2D[3]*pos[1];
+    pos = [nx, nz];
+  }
+  const ff = noise2d(pos[0]*0.002, pos[1]*0.002);
+  f += Math.pow(Math.abs(ff), 5.0) * 275 - 5.0;
+  return f;
+}
 
 function tick() {
   const time = clock.elapsedTime;
+  eagle.t = time * eagle.speed;
   
-  // Birdeye camera: orbit around origin at high altitude
-  birdState.angle += birdState.speed * 0.3;
-  const camX = Math.cos(birdState.angle) * birdState.radius;
-  const camZ = Math.sin(birdState.angle) * birdState.radius;
-  camera.position.set(camX, birdState.height, camZ);
+  // Eagle flight path: figure-8 + terrain following
+  const t = eagle.t;
   
-  // Look at center (birdeye view)
-  camera.lookAt(0, 0, 0);
+  // Primary path (long waves)
+  const pathX = Math.sin(t * 0.3) * eagle.waveAmp + Math.cos(t * 0.1) * 30;
+  const pathZ = t * 80 + Math.sin(t * 0.2) * eagle.waveAmp;
+  
+  // Secondary variation (short waves)
+  const varX = Math.sin(t * 0.55) * eagle.waveAmp2;
+  const varZ = Math.cos(t * 0.45) * eagle.waveAmp2;
+  
+  const camX = pathX + varX;
+  const camZ = pathZ + varZ;
+  
+  // Sample terrain height at camera position
+  const groundH = terrainJS(camX, camZ);
+  
+  // Eagle flies at variable height: low over water, high over mountains
+  const targetHeight = groundH + 8 + Math.sin(t * 0.15) * 5 + Math.cos(t * 0.28) * 3;
+  
+  // Smooth height transitions
+  const currentY = lerp(camera.position.y, targetHeight, 0.02);
+  camera.position.set(camX, currentY, camZ);
+  
+  // Look ahead along the flight path
+  const lookAheadT = t + 0.5;
+  const lookX = Math.sin(lookAheadT * 0.3) * eagle.waveAmp + Math.cos(lookAheadT * 0.1) * 30 + Math.sin(lookAheadT * 0.55) * eagle.waveAmp2;
+  const lookZ = lookAheadT * 80 + Math.sin(lookAheadT * 0.2) * eagle.waveAmp + Math.cos(lookAheadT * 0.45) * eagle.waveAmp2;
+  const lookH = terrainJS(lookX, lookZ) + 8;
+  const lookY = lerp(currentY, lookH, 0.02);
+  
+  camera.lookAt(lookX, lookY, lookZ);
   camera.updateMatrixWorld();
   
-  material.uniforms.uCameraPos.value.set(camX, birdState.height, camZ);
-  material.uniforms.uCameraDir.value.set(-camX, -birdState.height, -camZ).normalize();
+  // Calculate forward direction for shader
+  const forward = new THREE.Vector3(lookX - camX, lookY - currentY, lookZ - camZ).normalize();
+  
+  material.uniforms.uCameraPos.value.set(camX, currentY, camZ);
+  material.uniforms.uCameraDir.value.copy(forward);
   material.uniforms.uTime.value = time;
   
   renderer.render(scene, camera);
