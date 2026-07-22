@@ -67,10 +67,10 @@ uniform vec3 uCameraDir;
 uniform float uTime;
 uniform vec2 uResolution;
 
-vec3 sunLight = normalize(vec3(-0.5, 0.06, 0.7));
-vec3 sunColour = vec3(1.0, 0.45, 0.08);
+vec3 sunLight = normalize(vec3(-0.55, 0.04, 0.7));
+vec3 sunColour = vec3(1.0, 0.5, 0.06);
 float specular = 0.0;
-float ambient = 0.35;
+float ambient = 0.25;
 vec2 add = vec2(1.0, 0.0);
 #define HASHSCALE1 .1031
 #define HASHSCALE3 vec3(.1031, .1030, .0973)
@@ -185,13 +185,20 @@ vec3 GetClouds(in vec3 sky, in vec3 rd) {
 
 vec3 GetSky(in vec3 rd) {
   float sunAmount = max(dot(rd, sunLight), 0.0);
-  float v = pow(1.0-max(rd.y,0.0),5.)*.5;
-  // Dawn sky: warm horizon, deep blue zenith
-  vec3 sky = vec3(v*sunColour.x*0.6+0.15, v*sunColour.y*0.5+0.18, v*0.2+0.35);
-  // Sun glow (wide)
-  sky = sky + sunColour * pow(sunAmount, 4.0)*.45;
-  // Sun disc (bright)
-  sky = sky + vec3(1.0, 0.8, 0.4) * min(pow(sunAmount, 850.0), .4)*.7;
+  float horiz = pow(1.0 - max(rd.y, 0.0), 4.0);
+  float zenith = 1.0 - horiz;
+  
+  // Dawn sky: warm orange on horizon -> purple/magenta mid -> deep blue zenith
+  vec3 horizonCol = vec3(0.9, 0.35, 0.08) * 1.2;  // bright orange
+  vec3 zenithCol = vec3(0.08, 0.12, 0.45);         // deep blue
+  
+  vec3 sky = mix(zenithCol, horizonCol, horiz * 0.8);
+  
+  // Sun glow — wide warm halo
+  sky += vec3(1.0, 0.6, 0.15) * pow(sunAmount, 3.0) * 0.6;
+  // Sun disc
+  sky += vec3(1.0, 0.9, 0.5) * min(pow(sunAmount, 600.0), 0.5) * 0.8;
+  
   return sky;
 }
 
