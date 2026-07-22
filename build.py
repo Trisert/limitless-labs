@@ -122,6 +122,13 @@ def article_page(post):
         ld["datePublished"] = date_pub
         ld["dateModified"] = date_pub
     json_ld = f'<script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>'
+    sw_script = (
+        "<script>\n"
+        "if ('serviceWorker' in navigator) {\n"
+        "  navigator.serviceWorker.register('/limitless-labs/service-worker.js', {scope: '/limitless-labs/'});\n"
+        "}\n"
+        "</script>\n"
+    )
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -146,6 +153,8 @@ def article_page(post):
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../style.css?v=3"/>
+<link rel="manifest" href="/limitless-labs/manifest.json"/>
+<meta name="theme-color" content="#FFB000"/>
 </head>
 <body>
 <div class="wrap"><nav style="padding:22px 0">
@@ -157,6 +166,7 @@ def article_page(post):
   <p style="margin-top:48px"><a href="../#writing" style="color:var(--steel)">&larr; Back to transmission log</a></p>
 </div></main>
 <footer style="padding:48px 0"><div class="wrap" style="font-family:var(--font-mono);font-size:11px;color:var(--text-faint)">&copy; 2026 LIMITLESS LABS &middot; BUILT ON EARTH, AIMED AT ORBIT</div></footer>
+{sw_script}
 </body></html>"""
 
 def log_rows(posts):

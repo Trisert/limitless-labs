@@ -27,6 +27,8 @@
 }
 </script>
 <link rel="stylesheet" href="/limitless-labs/style.css?v=3">
+<link rel="manifest" href="/limitless-labs/manifest.json">
+<meta name="theme-color" content="#FFB000">
 </head>
 <body>
 
@@ -183,5 +185,10 @@
 </script>
 <script type="module" src="/limitless-labs/hero3d.js"></script>
 <script src="/limitless-labs/scroll.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/limitless-labs/service-worker.js', { scope: '/limitless-labs/' });
+}
+</script>
 </body>
 </html>
