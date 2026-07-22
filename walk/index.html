@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="/limitless-labs/style.css?v=3">
 <style id="walk-inline-css">
   html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#0b0d0f}
-  #walk-canvas{position:fixed;inset:0;display:block;width:100%;height:100%}
+  #walk-canvas{position:fixed;inset:0;display:block;width:100%;height:100%;}
   .walk-ui{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);display:flex;gap:12px;z-index:10}
   .walk-chip{background:rgba(11,13,15,.55);border:1px solid rgba(224,167,67,.25);color:#e6e6e6;padding:10px 14px;border-radius:999px;backdrop-filter:blur(6px);font:14px/1.2 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
   .walk-chip .accent{color:#e0a743}
@@ -56,326 +56,31 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1.0, 1200);
 camera.position.set(0, 4.2, 0);
 const sunDir = new THREE.Vector3(200, 120, -90).normalize();
-const ambientLight = new THREE.AmbientLight('#b8c8d8', 0.9);
-const sunLight = new THREE.DirectionalLight('#fff4e0', 2.4);
-sunLight.position.copy(sunDir).multiplyScalar(120);
-scene.add(ambientLight, sunLight);
 
 // ============================================================
-// SKY — atmospheric Rayleigh/Mie approximation
+// SHADER — fullscreen quad with raymarching
+// Based on iq's techniques from Shadertoy "Elevated"
 // ============================================================
-const skyVertexShader = `
-varying vec3 vWorldPos;
-void main() {
-  vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-}
-`;
-const skyFragmentShader = `
-varying vec3 vWorldPos;
-uniform vec3 uSunDir;
-uniform float uTime;
-float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-float noise(vec2 p) {
-  vec2 i = floor(p); vec2 f = fract(p); f = f*f*(3.0-2.0*f);
-  return mix(mix(hash(i), hash(i+vec2(1,0)), f.x), mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), f.x), f.y);
-}
-float fbm(vec2 p) {
-  float v = 0.0, a = 0.5;
-  for (int i = 0; i < 6; i++) { v += a * noise(p); p *= 2.05; a *= 0.48; }
-  return v;
-}
-void main() {
-  vec3 dir = normalize(vWorldPos);
-  float y = dir.y * 0.5 + 0.5;
 
-  // sun disk + low-atmosphere haze
-  float sun = max(dot(dir, normalize(uSunDir)), 0.0);
-  vec3 haze = vec3(0.72, 0.76, 0.82);
-  vec3 horizon = mix(vec3(0.72, 0.76, 0.83), vec3(0.88, 0.84, 0.78), pow(sun, 4.0));
-  vec3 zenith = vec3(0.18, 0.34, 0.62);
-  vec3 nadir = vec3(0.52, 0.48, 0.44);
-  vec3 col = mix(nadir, mix(horizon, zenith, pow(y, 0.55)), step(0.0, dir.y));
-
-  // soft sky blob near horizon + sun
-  col += vec3(0.95, 0.88, 0.72) * pow(sun, 8.0) * 0.18;
-  col += vec3(1.0, 0.96, 0.82) * pow(sun, 32.0) * 0.45;
-  col += vec3(1.0, 0.94, 0.78) * pow(sun, 160.0) * 0.9;
-
-  // haze under sun
-  float hDir = max(dot(normalize(vec3(dir.x, 0.0, dir.z)), normalize(vec3(uSunDir.x, 0.0, uSunDir.z))), 0.0);
-  col = mix(col, haze, pow(hDir, 6.0) * 0.35 * smoothstep(0.35, 0.75, y));
-
-  // clouds layers
-  vec3 sunH = normalize(vec3(uSunDir.x, max(uSunDir.y, 0.05), uSunDir.z));
-  float cloudA = fbm(dir.xz / (dir.y + 0.45) * 1.35 + uTime * 0.004);
-  cloudA = smoothstep(0.48, 0.72, cloudA);
-  float cloudB = fbm(dir.xz / (dir.y + 0.35) * 1.8 - uTime * 0.003 + 3.7);
-  cloudB = smoothstep(0.52, 0.78, cloudB);
-  float cloudMask = (cloudA * 0.7 + cloudB * 0.3);
-  // backscatter around sun
-  float sunBack = pow(max(dot(dir, sunH), 0.0), 2.0);
-  cloudMask += sunBack * 0.2;
-  vec3 cloudCol = mix(haze, vec3(1.0, 0.95, 0.9), pow(sunBack, 2.0));
-  col = mix(col, cloudCol, cloudMask * 0.85);
-
-  // darker at very low angles for depth
-  col *= 1.0 - (1.0 - y) * 0.45;
-
-  gl_FragColor = vec4(col, 1.0);
-}
-`;
-
-// ============================================================
-// ROAD SYSTEM — spline-based procedural road
-// ============================================================
-const ROAD_SPLINE_POINTS = 220;
-const ROAD_SPLINE_STEP = 80;
-const ROAD_WIDTH = 6.5;
-const ROAD_SEGMENTS = 48;
-const ROAD_VERTEX_COUNT = ROAD_SPLINE_POINTS * ROAD_SEGMENTS * 4;
-
-function generateRoadSpline() {
-  const points = []; const tangents = []; const upVectors = [];
-  let pos = new THREE.Vector3(0, 0, 0);
-  let forward = new THREE.Vector3(0, 0, -1);
-  let up = new THREE.Vector3(0, 1, 0);
-  let right = new THREE.Vector3(1, 0, 0);
-
-  function roadNoise(x, z, scale) {
-    let v = 0, a = 1;
-    const p = new THREE.Vector2(x ?? 0, z ?? 0).multiplyScalar(scale);
-    for (let i = 0; i < 5; i++) {
-      const np = p.clone().multiplyScalar(a);
-      const h = Math.sin(np.x * 12.9898 + np.y * 78.233) * 43758.5453;
-      v += a * (h - Math.floor(h));
-      a *= 0.5;
-    }
-    return v;
-  }
-
-  for (let i = 0; i < ROAD_SPLINE_POINTS; i++) {
-    const baseDist = i * ROAD_SPLINE_STEP;
-    const curveAmount = roadNoise(baseDist * 0.001, 0, 1.0) * 2.0 - 1.0;
-    const curvature = curveAmount * 0.00065;
-    const bankAngle = curvature * 140.0;
-    const elevationNoise = roadNoise(baseDist * 0.0005, 1000, 1.0);
-    const elevation = elevationNoise * 22.0;
-
-    const turnQuat = new THREE.Quaternion().setFromAxisAngle(up, curvature * ROAD_SPLINE_STEP);
-    forward.applyQuaternion(turnQuat).normalize();
-    right.crossVectors(up, forward).normalize();
-    const bankQuat = new THREE.Quaternion().setFromAxisAngle(forward, bankAngle);
-    const tiltedUp = up.clone().applyQuaternion(bankQuat).normalize();
-    pos.addScaledVector(forward, ROAD_SPLINE_STEP);
-    pos.y = elevation;
-
-    points.push(pos.clone());
-    tangents.push(forward.clone());
-    upVectors.push(tiltedUp.clone());
-  }
-  return { points, tangents, upVectors };
-}
-
-function buildRoadMesh(spline) {
-  const positions = new Float32Array(ROAD_VERTEX_COUNT * 3);
-  const uvs = new Float32Array(ROAD_VERTEX_COUNT * 2);
-  const normals = new Float32Array(ROAD_VERTEX_COUNT * 3);
-  const roadIds = new Float32Array(ROAD_VERTEX_COUNT);
-  let idx = 0;
-
-  for (let seg = 0; seg < ROAD_SPLINE_POINTS - 1; seg++) {
-    const p0 = spline.points[seg]; const p1 = spline.points[seg + 1];
-    const t0 = spline.tangents[seg]; const t1 = spline.tangents[seg + 1];
-    const u0 = spline.upVectors[seg]; const u1 = spline.upVectors[seg + 1];
-    const r0 = new THREE.Vector3().crossVectors(u0, t0).normalize();
-    const r1 = new THREE.Vector3().crossVectors(u1, t1).normalize();
-
-    for (let s = 0; s <= ROAD_SEGMENTS; s++) {
-      const u = s / ROAD_SEGMENTS; const invU = 1 - u;
-      const pos = new THREE.Vector3().copy(p0).multiplyScalar(invU).addScaledVector(p1, u);
-      const tangent = new THREE.Vector3().copy(t0).multiplyScalar(invU).addScaledVector(t1, u).normalize();
-      const up = new THREE.Vector3().copy(u0).multiplyScalar(invU).addScaledVector(u1, u).normalize();
-      const right = new THREE.Vector3().crossVectors(up, tangent).normalize();
-
-      const crown = (r) => r === 1 ? 0.04 * (1 - Math.abs((r - 0.5) * 2)) : 0;
-      const profile = [
-        { offset: -ROAD_WIDTH * 0.72, id: 0 },
-        { offset: -ROAD_WIDTH * 0.38, id: 1 },
-        { offset:  ROAD_WIDTH * 0.38, id: 1 },
-        { offset:  ROAD_WIDTH * 0.72, id: 0 }
-      ];
-      for (let pi = 0; pi < profile.length; pi++) {
-        const prof = profile[pi];
-        const vertex = pos.clone().addScaledVector(right, prof.offset);
-        vertex.y += crown(prof.id);
-
-        positions[idx * 3] = vertex.x;
-        positions[idx * 3 + 1] = vertex.y;
-        positions[idx * 3 + 2] = vertex.z;
-        uvs[idx * 2] = (seg + u) / (ROAD_SPLINE_POINTS - 1);
-        uvs[idx * 2 + 1] = pi / (profile.length - 1);
-        roadIds[idx] = prof.id;
-        const nrm = up;
-        normals[idx * 3] = nrm.x; normals[idx * 3 + 1] = nrm.y; normals[idx * 3 + 2] = nrm.z;
-        idx++;
-      }
-    }
-  }
-  const geom = new THREE.BufferGeometry();
-  geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geom.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
-  geom.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
-  geom.setAttribute('roadId', new THREE.BufferAttribute(roadIds, 1));
-  geom.computeBoundingSphere();
-  return geom;
-}
-
-const roadVertexShader = `
+const vertexShader = `
 varying vec2 vUv;
-varying vec3 vWorldPos;
-varying vec3 vNormal;
-varying float vRoadId;
 void main() {
   vUv = uv;
-  vRoadId = roadId;
-  vNormal = normalize(normalMatrix * normal);
-  vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-}
-`;
-const roadFragmentShader = `
-varying vec2 vUv;
-varying vec3 vWorldPos;
-varying vec3 vNormal;
-varying float vRoadId;
-uniform vec3 uSunDir;
-uniform float uTime;
-float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-float noise(vec2 p) {
-  vec2 i = floor(p); vec2 f = fract(p); f = f*f*(3.0-2.0*f);
-  return mix(mix(hash(i), hash(i+vec2(1,0)), f.x), mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), f.x), f.y);
-}
-float fbm(vec2 p) {
-  float v = 0.0, a = 0.5;
-  for (int i = 0; i < 4; i++) { v += a * noise(p); p *= 2.15; a *= 0.5; }
-  return v;
-}
-void main() {
-  float alongRoad = vUv.x;
-  float acrossRoad = vUv.y;
-  vec3 asphalt = vec3(0.12, 0.11, 0.10);
-  vec3 shoulder = vec3(0.22, 0.20, 0.17);
-  vec3 lineWhite = vec3(0.94, 0.94, 0.90);
-  vec3 lineYellow = vec3(1.0, 0.85, 0.15);
-  vec3 col = shoulder;
-  if (vRoadId > 0.5 && vRoadId < 1.5) {
-    float n = fbm(vWorldPos.xz * 0.35) * 0.18;
-    col = asphalt * (0.9 + n);
-    float centerDist = abs(acrossRoad - 0.5);
-    float dash = fract(alongRoad * 0.9 + uTime * 0.02);
-    if (centerDist < 0.018 && dash < 0.55) { col = mix(col, lineYellow, 0.95); }
-    float edgeDist = min(abs(acrossRoad - 0.28), abs(acrossRoad - 0.72));
-    if (edgeDist < 0.014) { col = mix(col, lineWhite, 0.85); }
-    float wear = smoothstep(0.36, 0.45, acrossRoad) * smoothstep(0.55, 0.64, acrossRoad);
-    col *= 1.0 - wear * 0.18;
-  } else {
-    float n = fbm(vWorldPos.xz * 0.14 + uTime * 0.01) * 0.3;
-    col = shoulder * (0.82 + n);
-    float edgeLine = smoothstep(0.08, 0.12, acrossRoad) + smoothstep(0.88, 0.92, acrossRoad);
-    col = mix(col, lineWhite * 0.7, edgeLine * 0.35);
-  }
-  vec3 N = normalize(vNormal);
-  float NdotL = max(dot(N, normalize(uSunDir)), 0.0);
-  float wrap = max(dot(N, normalize(uSunDir + vec3(0.0, 0.3, 0.0))), 0.0);
-  vec3 ambient = vec3(0.22, 0.25, 0.30);
-  vec3 diffuse = vec3(1.0, 0.98, 0.90) * (wrap * 0.65 + 0.35);
-  col *= ambient + diffuse * NdotL * 0.85;
-  float fresnel = pow(1.0 - max(dot(N, normalize(-vWorldPos)), 0.0), 3.0);
-  col += vec3(0.08, 0.10, 0.13) * fresnel * 0.35;
-  gl_FragColor = vec4(col, 1.0);
+  gl_Position = vec4(position.xy, 0.0, 1.0);
 }
 `;
 
-let roadSpline = null;
-let roadMesh = null;
-const roadSplineObjects = [];
+const fragmentShader = `
+#define PI 3.14159265359
+#define TWO_PI 6.28318530718
 
-function initRoad() {
-  roadSpline = generateRoadSpline();
-  const geom = buildRoadMesh(roadSpline);
-  const roadMaterial = new THREE.ShaderMaterial({
-    vertexShader: roadVertexShader,
-    fragmentShader: roadFragmentShader,
-    uniforms: {
-      uSunDir: { value: sunDir.clone() },
-      uTime: { value: 0 }
-    }
-  });
-  roadMesh = new THREE.Mesh(geom, roadMaterial);
-  roadMesh.frustumCulled = false;
-  scene.add(roadMesh);
-
-  // Guardrail posts along road edges
-  const railGeo = new THREE.CylinderGeometry(0.06, 0.08, 1.1, 5);
-  const railMat = new THREE.MeshStandardMaterial({ color: '#3a3a3a', roughness: 0.7, metalness: 0.4 });
-  const railMax = 6000;
-  const railInst = new THREE.InstancedMesh(railGeo, railMat, railMax);
-  const dm = new THREE.Object3D();
-  let ri = 0;
-  for (let seg = 0; seg < ROAD_SPLINE_POINTS - 1 && ri < railMax; seg += 2) {
-    const p = roadSpline.points[seg];
-    const n = roadSpline.tangents[seg];
-    const u = roadSpline.upVectors[seg];
-    const r = new THREE.Vector3().crossVectors(u, n).normalize();
-    [r.clone().multiplyScalar(-ROAD_WIDTH * 0.72), r.clone().multiplyScalar(ROAD_WIDTH * 0.72)].forEach((side) => {
-      if (ri >= railMax) return;
-      dm.position.copy(p).add(side);
-      dm.rotation.y = Math.atan2(n.x, n.z);
-      dm.updateMatrix();
-      railInst.setMatrixAt(ri++, dm.matrix);
-    });
-  }
-  railInst.count = ri;
-  railInst.instanceMatrix.needsUpdate = true;
-  scene.add(railInst);
-  roadSplineObjects.push(railInst);
-}
-
-function getRoadInfoAt(worldX, worldZ) {
-  if (!roadSpline) return null;
-  let bestIdx = 0;
-  let bestDist = Infinity;
-  for (let i = 0; i < roadSpline.points.length; i++) {
-    const p = roadSpline.points[i];
-    const d = (p.x - worldX) ** 2 + (p.z - worldZ) ** 2;
-    if (d < bestDist) { bestDist = d; bestIdx = i; }
-  }
-  const i0 = bestIdx;
-  const i1 = Math.min(i0 + 1, roadSpline.points.length - 1);
-  const p0 = roadSpline.points[i0]; const p1 = roadSpline.points[i1];
-  const t0 = roadSpline.tangents[i0]; const t1 = roadSpline.tangents[i1];
-  const u0 = roadSpline.upVectors[i0]; const u1 = roadSpline.upVectors[i1];
-  const localDist = Math.sqrt(bestDist);
-  const u = Math.min(localDist / Math.max(ROAD_SPLINE_STEP, 1e-6), 1.0);
-  const invU = 1 - u;
-  const pos = new THREE.Vector3().copy(p0).multiplyScalar(invU).addScaledVector(p1, u);
-  const tangent = new THREE.Vector3().copy(t0).multiplyScalar(invU).addScaledVector(t1, u).normalize();
-  const up = new THREE.Vector3().copy(u0).multiplyScalar(invU).addScaledVector(u1, u).normalize();
-  const right = new THREE.Vector3().crossVectors(up, tangent).normalize();
-  return { pos, tangent, up, right, index: bestIdx + u, dist: Math.sqrt(bestDist) };
-}
-
-// ============================================================
-// TERRAIN
-// ============================================================
-const terrainVertexShader = `
-varying vec3 vWorldPos;
-varying vec3 vNormal;
-varying float vHeight;
 varying vec2 vUv;
-varying float vSlope;
+uniform vec3 uCameraPos;
+uniform vec3 uCameraDir;
+uniform vec3 uCameraUp;
 uniform float uTime;
+uniform vec2 uResolution;
+uniform float uSpeed;
 
 // iq's value noise with analytical derivatives
 vec3 noised(vec2 x) {
@@ -392,8 +97,8 @@ vec3 noised(vec2 x) {
               30.0*f*f*(f*(f-2.0)+1.0)*(vec2(b-a,c-a)+(a-b-c+d)*u.yx));
 }
 
-// iq's fbm with rotation matrix
 const mat2 m2 = mat2(1.6,-1.2,1.2,1.6);
+
 float fbm(vec2 p) {
   float f = 0.0;
   f += 0.5000*noised(p).x; p = m2*p*2.02;
@@ -424,437 +129,168 @@ float getHeight(vec2 p) {
   return terrain(p, d);
 }
 
-void main() {
-  vUv = uv;
-  vec3 pos = position;
-  vec2 d;
+// SDF for terrain raymarching
+float map(vec3 pos, out vec2 d) {
   float h = terrain(pos.xz, d);
-  pos.y += h;
-  vHeight = h;
-  vWorldPos = (modelMatrix * vec4(pos, 1.0)).xyz;
-  // analytical normal from derivatives
-  vec3 normal = normalize(vec3(-d.x, 1.0, -d.y));
-  vNormal = normalize(normalMatrix * normal);
-  vSlope = 1.0 - abs(normal.y);
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+  return pos.y - h;
 }
-`;
-const terrainFragmentShader = `
-varying vec3 vWorldPos;
-varying vec3 vNormal;
-varying float vHeight;
-varying vec2 vUv;
-varying float vSlope;
-uniform sampler2D uGrassTex;
-uniform sampler2D uRockTex;
-uniform sampler2D uDirtTex;
-uniform sampler2D uSnowTex;
-uniform vec3 uSunDir;
-uniform float uTime;
-// iq's value noise with analytical derivatives
-vec3 noised(vec2 x) {
-  vec2 p = floor(x);
-  vec2 f = fract(x);
-  f = f*f*(3.0-2.0*f);
-  vec2 u = f*f*(3.0-2.0*f);
-  float n = p.x + p.y*57.0;
-  float a = fract(sin(n+0.0)*43758.5453123);
-  float b = fract(sin(n+1.0)*43758.5453123);
-  float c = fract(sin(n+57.0)*43758.5453123);
-  float d = fract(sin(n+58.0)*43758.5453123);
-  return vec3(a+(b-a)*u.x+(c-a)*u.y+(a-b-c+d)*u.x*u.y,
-              30.0*f*f*(f*(f-2.0)+1.0)*(vec2(b-a,c-a)+(a-b-c+d)*u.yx));
+
+vec3 calcNormal(vec3 pos) {
+  vec2 d;
+  vec2 e = vec2(0.5, -0.5);
+  float r = 0.5;
+  vec3 n = vec3(
+    map(pos + vec3(r,0,0), d) - map(pos + vec3(-r,0,0), d),
+    map(pos + vec3(0,r,0), d) - map(pos + vec3(0,-r,0), d),
+    map(pos + vec3(0,0,r), d) - map(pos + vec3(0,0,-r), d)
+  );
+  return normalize(n);
 }
-const mat2 m2 = mat2(1.6,-1.2,1.2,1.6);
-float fbm(vec2 p) {
-  float f = 0.0;
-  f += 0.5000*noised(p).x; p = m2*p*2.02;
-  f += 0.2500*noised(p).x; p = m2*p*2.03;
-  f += 0.1250*noised(p).x; p = m2*p*2.01;
-  f += 0.0625*noised(p).x;
-  return f/0.9375;
+
+// iq's raymarching terrain intersection
+float intersect(vec3 ro, vec3 rd) {
+  float t = 0.0;
+  for(int i=0; i<128; i++) {
+    vec3 pos = ro + t*rd;
+    vec2 d;
+    float h = map(pos, d);
+    if(h < 0.001 && t > 0.1) return t;
+    float step = h * 0.5;
+    if(step < 0.01) step = 0.01;
+    t += step;
+    if(t > 1200.0) break;
+  }
+  return -1.0;
 }
-float vegetationNoise(vec2 p) {
-  return fbm(p * 0.025) * 0.5 + fbm(p * 0.1) * 0.3 + fbm(p * 0.4) * 0.2;
-}
+
 void main() {
-  vec3 N = normalize(vNormal);
-  float h = vHeight;
-  float t = clamp(h / 140.0, 0.0, 1.0);
-  float grassW = 1.0 - smoothstep(0.15, 0.45, t);
-  float dirtW = smoothstep(0.25, 0.50, t) * (1.0 - smoothstep(0.50, 0.70, t));
-  float rockW = smoothstep(0.45, 0.75, t) * (1.0 - smoothstep(0.75, 0.92, t));
-  float snowW = smoothstep(0.82, 0.98, t);
-  float slope = vSlope;
-  rockW += slope * 0.55; dirtW += slope * 0.25; grassW = max(0.0, grassW - slope * 0.7);
+  vec2 xy = vUv * 2.0 - 1.0;
+  xy.x *= uResolution.x / uResolution.y;
 
-  vec2 uv1 = vWorldPos.xz * 0.12; vec2 uv2 = vWorldPos.xz * 0.06;
-  float detail = fbm(uv2 * 3.0 + uTime * 0.008) * 0.5;
-  vec3 grass = texture2D(uGrassTex, uv1 + detail * 0.05).rgb;
-  vec3 dirt  = texture2D(uDirtTex, uv1 * 1.1 + detail * 0.04).rgb;
-  vec3 rock  = texture2D(uRockTex, uv1 * 0.9 + detail * 0.06).rgb;
-  vec3 snow  = texture2D(uSnowTex, uv1 * 1.2 + detail * 0.03).rgb;
+  vec3 ro = uCameraPos;
+  vec3 ta = uCameraPos + uCameraDir;
 
-  // multi-octave detail for surface richness (stochastic-style)
-  vec2 dudv = vWorldPos.xz * 0.5;
-  float micro = fbm(dudv * 4.0) * 0.12;
-  float macro = fbm(dudv * 0.8 + 1.7) * 0.08;
-  vec3 col = grass * grassW + dirt * dirtW + rock * rockW + snow * snowW;
-  col += (micro + macro) * 0.15;
-  // color variation per biome
-  col *= 1.0 + vec3(0.03, 0.05, 0.01) * sin(vWorldPos.x * 0.3 + vWorldPos.z * 0.2);
+  vec3 cw = normalize(ta - ro);
+  vec3 cp = vec3(0.0, 1.0, 0.0);
+  vec3 cu = normalize(cross(cw, cp));
+  vec3 cv = normalize(cross(cu, cw));
+  vec3 rd = normalize(xy.x * cu + xy.y * cv + 1.5 * cw);
 
-  // vegetation "green boost" from procedural mask
-  float veg = vegetationNoise(vWorldPos.xz);
-  float grassPatch = smoothstep(0.38, 0.55, veg);
-  col = mix(col, grass * 1.08, grassPatch * grassW * 0.45);
+  vec3 light1 = normalize(vec3(0.4, 0.22, 0.6));
+  float sundot = clamp(dot(rd, light1), 0.0, 1.0);
 
-  col *= 1.0 - slope * 0.28;
-  float shadow = fbm(vWorldPos.xz * 0.22) * 0.12;
-  col *= 1.0 - shadow;
+  vec3 col;
+  float t = intersect(ro, rd);
 
-  // distance fog/atmospheric perspective (matches sky horizon color)
-  float dist = length(vWorldPos - cameraPosition);
-  float fog = 1.0 - exp(-dist * 0.00025);
-  vec3 fogCol = mix(vec3(0.72, 0.76, 0.82), vec3(0.92, 0.88, 0.82), pow(max(dot(normalize(vWorldPos - cameraPosition), normalize(uSunDir)), 0.0), 2.5));
-  col = mix(col, fogCol, fog * 0.65);
+  if(t < 0.0) {
+    // Sky
+    col = vec3(0.85, 0.95, 1.0) * (1.0 - 0.5 * rd.y);
+    col += 0.25 * vec3(1.0, 0.8, 0.4) * pow(sundot, 12.0);
+  } else {
+    vec3 pos = ro + t * rd;
+    vec3 nor = calcNormal(pos);
 
-  float NdotL = max(dot(N, normalize(uSunDir)), 0.0);
-  float wrap = max(dot(N, normalize(uSunDir + vec3(0.0, 0.3, 0.0))), 0.0);
-  vec3 ambient = vec3(0.18, 0.22, 0.28);
-  vec3 diffuse = vec3(1.0, 0.98, 0.88) * (wrap * 0.75 + 0.25);
-  col *= ambient + diffuse * NdotL;
+    float h = pos.y;
+    float t_norm = clamp(h / 140.0, 0.0, 1.0);
+
+    // Biome blending (iq's technique)
+    float grassW = 1.0 - smoothstep(0.15, 0.45, t_norm);
+    float dirtW = smoothstep(0.25, 0.50, t_norm) * (1.0 - smoothstep(0.50, 0.70, t_norm));
+    float rockW = smoothstep(0.45, 0.75, t_norm) * (1.0 - smoothstep(0.75, 0.92, t_norm));
+    float snowW = smoothstep(0.82, 0.98, t_norm);
+
+    float slope = 1.0 - abs(nor.y);
+    rockW += slope * 0.55;
+    dirtW += slope * 0.25;
+    grassW = max(0.0, grassW - slope * 0.7);
+
+    // Texture colors (procedural)
+    vec3 grass = vec3(0.25, 0.55, 0.20);
+    vec3 dirt = vec3(0.45, 0.30, 0.18);
+    vec3 rock = vec3(0.40, 0.38, 0.34);
+    vec3 snow = vec3(0.95, 0.96, 0.98);
+
+    // Detail noise
+    float r = fbm(pos.xz * 7.0);
+    vec3 col_terrain = (r * 0.25 + 0.75) * 0.9 * mix(
+      vec3(0.08, 0.05, 0.03),
+      vec3(0.13, 0.10, 0.08),
+      clamp(terrain(vec2(pos.x, pos.y * 48.0), d) / 200.0, 0.0, 1.0)
+    );
+
+    col_terrain = mix(col_terrain, 0.15 * vec3(0.45, 0.23, 0.04) * (0.50 + 0.50 * r), smoothstep(0.70, 0.9, nor.y));
+    col_terrain = mix(col_terrain, 0.10 * vec3(0.30, 0.30, 0.00) * (0.25 + 0.75 * r), smoothstep(0.95, 1.0, nor.y));
+
+    col = grass * grassW + dirt * dirtW + rock * rockW + snow * snowW;
+    col *= col_terrain * 0.3 + col * 0.7;
+
+    // Snow (iq's technique)
+    float h_snow = smoothstep(55.0, 80.0, pos.y + 25.0 * fbm(0.01 * pos.xz));
+    float e = smoothstep(1.0 - 0.5 * h_snow, 1.0 - 0.1 * h_snow, nor.y);
+    float o = 0.3 + 0.7 * smoothstep(0.0, 0.1, nor.x + h_snow * h_snow);
+    float s = h_snow * e * o;
+    col = mix(col, 0.35 * vec3(0.62, 0.65, 0.7), smoothstep(0.1, 0.9, s));
+
+    // Lighting
+    float amb = clamp(0.5 + 0.5 * nor.y, 0.0, 1.0);
+    float dif = clamp(dot(light1, nor), 0.0, 1.0);
+    float bac = clamp(0.2 + 0.8 * dot(normalize(vec3(-light1.x, 0.0, light1.z)), nor), 0.0, 1.0);
+
+    vec3 lin = vec3(0.0);
+    lin += dif * vec3(8.0, 5.5, 3.0);
+    lin += amb * vec3(0.30, 0.50, 0.60);
+    lin += bac * vec3(0.60, 0.60, 0.60);
+    col *= lin;
+
+    // Atmospheric fog
+    float fo = 1.0 - exp(-0.0007 * t);
+    vec3 fco = vec3(0.55, 0.65, 0.75) + 0.6 * vec3(1.0, 0.8, 0.5) * pow(sundot, 4.0);
+    col = mix(col, fco, fo);
+
+    col += 0.4 * vec3(1.0, 0.8, 0.4) * pow(sundot, 8.0) * (1.0 - exp(-0.005 * t));
+  }
+
+  col = pow(col, vec3(0.45));
+  col = col * 0.6 + 0.4 * col * col * (3.0 - 2.0 * col);
+
+  vec2 uv = vUv * 0.5 + 0.5;
+  col *= 0.7 + 0.3 * pow(16.0 * uv.x * uv.y * (1.0 - uv.x) * (1.0 - uv.y), 0.1);
+
   gl_FragColor = vec4(col, 1.0);
 }
 `;
 
-// ============================================================
-// WATER
-// ============================================================
-const waterVertexShader = `
-varying vec2 vUv;
-varying vec3 vWorldPos;
-uniform float uTime;
-void main() {
-  vUv = uv;
-  vec3 pos = position;
-  pos.y += sin(pos.x * 0.3 + uTime * 0.55) * 0.14;
-  pos.y += cos(pos.z * 0.24 + uTime * 0.45) * 0.14;
-  vWorldPos = (modelMatrix * vec4(pos, 1.0)).xyz;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-}
-`;
-const waterFragmentShader = `
-varying vec2 vUv;
-varying vec3 vWorldPos;
-uniform float uTime;
-uniform vec3 uSunDir;
-float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-float noise(vec2 p) {
-  vec2 i = floor(p); vec2 f = fract(p); f = f*f*(3.0-2.0*f);
-  return mix(mix(hash(i), hash(i+vec2(1,0)), f.x), mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), f.x), f.y);
-}
-void main() {
-  vec3 deep = vec3(0.10, 0.22, 0.33);
-  vec3 shallow = vec3(0.22, 0.42, 0.54);
-  float n = noise(vWorldPos.xz * 0.072 + uTime * 0.12) * 0.5 + 0.5;
-  vec3 col = mix(deep, shallow, n);
-  float fresnel = pow(1.0 - abs(dot(vec3(0.0, 1.0, 0.0), normalize(vec3(0.0, 1.0, 0.0)))), 2.0);
-  float spec = pow(max(dot(normalize(vec3(0.0, 1.0, 0.0)), normalize(uSunDir)), 0.0), 48.0);
-  col += vec3(0.6, 0.7, 0.8) * fresnel * 0.28;
-  col += vec3(1.0, 1.0, 1.0) * spec * 0.25;
-  gl_FragColor = vec4(col, 0.76);
-}
-`;
-
-// ============================================================
-// TEXTURES — procedural
-// ============================================================
-function valueNoise(x, y, octaves) {
-  let v = 0, a = 1, f = 1;
-  const hash = (n) => { let s = Math.sin(n) * 43758.5453; return s - Math.floor(s); };
-  const smooth = (t) => t*t*t*(t*(t*6-15)+10);
-  for (let i = 0; i < octaves; i++) {
-    const ix = Math.floor(x*f), iz = Math.floor(y*f);
-    const fx = smooth(x*f - ix), fz = smooth(y*f - iz);
-    const v1 = hash(ix + iz*7919);
-    const v2 = hash(ix+1 + iz*7919);
-    const v3 = hash(ix + (iz+1)*7919);
-    const v4 = hash(ix+1 + (iz+1)*7919);
-    v += a * (v1*(1-fx)*(1-fz) + v2*fx*(1-fz) + v3*(1-fx)*fz + v4*fx*fz);
-    a *= 0.5; f *= 2.0;
-  }
-  return v;
-}
-function makeTexture(size, fn) {
-  const c = document.createElement('canvas');
-  c.width = c.height = size;
-  const ctx = c.getContext('2d');
-  const img = ctx.createImageData(size, size);
-  const d = img.data;
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const i = (y * size + x) * 4;
-      const [r, g, b, a] = fn(x / size, y / size);
-      d[i] = r; d[i+1] = g; d[i+2] = b; d[i+3] = a;
-    }
-  }
-  ctx.putImageData(img, 0, 0);
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.minFilter = THREE.LinearMipmapLinearFilter;
-  tex.generateMipmaps = true;
-  tex.needsUpdate = true;
-  return tex;
-}
-const grassTex = makeTexture(256, (u, v) => {
-  const n1 = valueNoise(u*37.3, v*11.7, 3);
-  const n2 = valueNoise(u*13.1, v*29.9, 2);
-  const n3 = valueNoise(u*7.7, v*53.3, 1);
-  const n = n1*0.15 + n2*0.1 + n3*0.08 + 0.65;
-  return [n*120+80, n*180+100, n*90+60, 255];
-});
-const dirtTex = makeTexture(256, (u, v) => {
-  const n1 = valueNoise(u*23.7, v*41.1, 3);
-  const n2 = valueNoise(u*57.3, v*19.3, 2);
-  const n3 = valueNoise(u*31.1, v*7.9, 1);
-  const n = n1*0.2 + n2*0.15 + n3*0.1 + 0.55;
-  return [n*140+80, n*100+60, n*70+40, 255];
-});
-const rockTex = makeTexture(256, (u, v) => {
-  const n1 = valueNoise(u*53.1, v*31.7, 3);
-  const n2 = valueNoise(u*17.9, v*47.3, 2);
-  const n3 = valueNoise(u*11.3, v*61.7, 1);
-  const n = n1*0.25 + n2*0.2 + n3*0.1 + 0.45;
-  return [n*130+80, n*120+70, n*110+60, 255];
-});
-const snowTex = makeTexture(256, (u, v) => {
-  const n1 = valueNoise(u*31.3, v*23.1, 2);
-  const n2 = valueNoise(u*19.7, v*41.9, 1);
-  const n = n1*0.08 + n2*0.04 + 0.88;
-  return [n*255, n*252, n*255, 255];
-});
-
-const terrainMaterial = new THREE.ShaderMaterial({
-  vertexShader: terrainVertexShader,
-  fragmentShader: terrainFragmentShader,
+const material = new THREE.ShaderMaterial({
+  vertexShader,
+  fragmentShader,
   uniforms: {
+    uCameraPos: { value: camera.position.clone() },
+    uCameraDir: { value: new THREE.Vector3(0, 0, -1) },
+    uCameraUp: { value: new THREE.Vector3(0, 1, 0) },
     uTime: { value: 0 },
-    uSunDir: { value: sunDir.clone() },
-    uGrassTex: { value: grassTex },
-    uDirtTex: { value: dirtTex },
-    uRockTex: { value: rockTex },
-    uSnowTex: { value: snowTex },
+    uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+    uSpeed: { value: 1.0 },
   },
-});
-const waterMaterial = new THREE.ShaderMaterial({
-  vertexShader: waterVertexShader,
-  fragmentShader: waterFragmentShader,
-  uniforms: { uTime: { value: 0 }, uSunDir: { value: sunDir.clone() } },
-  transparent: true,
-});
-const skyMaterial = new THREE.ShaderMaterial({
-  vertexShader: skyVertexShader,
-  fragmentShader: skyFragmentShader,
-  uniforms: { uSunDir: { value: sunDir.clone() }, uTime: { value: 0 } },
-  side: THREE.BackSide,
+  side: THREE.DoubleSide,
 });
 
-const skyGeo = new THREE.SphereGeometry(450, 32, 32);
-const skyMesh = new THREE.Mesh(skyGeo, skyMaterial);
-scene.add(skyMesh);
+const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material);
+scene.add(quad);
 
-// terrain chunks
-const CHUNK = 96; const SEG = 64; const chunks = new Map();
-function chunkKey(cx, cz) { return `${cx},${cz}`; }
-function ensureChunk(cx, cz) {
-  const key = chunkKey(cx, cz);
-  if (chunks.has(key)) return;
-  let mesh = chunkPool.pop();
-  if (mesh) {
-    mesh.position.set(cx * CHUNK, 0, cz * CHUNK);
-  } else {
-    const geom = new THREE.PlaneGeometry(CHUNK, CHUNK, SEG, SEG);
-    geom.rotateX(-Math.PI / 2);
-    mesh = new THREE.Mesh(geom, terrainMaterial);
-    mesh.position.set(cx * CHUNK, 0, cz * CHUNK);
-  }
-  scene.add(mesh);
-  chunks.set(key, mesh);
-}
-function removeChunk(cx, cz) {
-  const key = chunkKey(cx, cz);
-  const mesh = chunks.get(key);
-  if (!mesh) return;
-  scene.remove(mesh);
-  chunkPool.push(mesh);
-  chunks.delete(key);
-}
-const CHUNKS_RADIUS = 1;
-const chunkPool = [];
-const desiredSet = new Set();
-for (let x = -CHUNKS_RADIUS; x <= CHUNKS_RADIUS; x++)
-  for (let z = -CHUNKS_RADIUS; z <= CHUNKS_RADIUS; z++) ensureChunk(x, z);
-
-const waterGeo = new THREE.PlaneGeometry(CHUNK * 6, CHUNK * 6);
-waterGeo.rotateX(-Math.PI / 2);
-const water = new THREE.Mesh(waterGeo, waterMaterial);
-water.position.y = 2.8;
-scene.add(water);
-
-// ============================================================
-// VEGETATION — low-poly 3D trees (performance-friendly)
-// ============================================================
-const trunkGeom = new THREE.CylinderGeometry(0.18, 0.32, 2.2, 5);
-const foliageGeoms = [
-  new THREE.ConeGeometry(1.4, 3.8, 6, 1),
-  new THREE.ConeGeometry(1.1, 3.0, 5, 1),
-  new THREE.ConeGeometry(1.6, 4.2, 7, 1),
-  new THREE.SphereGeometry(1.3, 6, 4),
-];
-const trunkMat = new THREE.MeshStandardMaterial({ color: '#5d4037', roughness: 0.92 });
-const foliageMats = [
-  new THREE.MeshStandardMaterial({ color: '#2e7d32', roughness: 0.88, map: grassTex, mapIntensity: 0.3 }),
-  new THREE.MeshStandardMaterial({ color: '#388e3c', roughness: 0.85, map: grassTex, mapIntensity: 0.3 }),
-  new THREE.MeshStandardMaterial({ color: '#1b5e20', roughness: 0.9, map: grassTex, mapIntensity: 0.25 }),
-];
-const treeGroups = [];
-const MAX_TREES = 2000;
-const treePool = [];
-function sampleHeightJS(x, z) {
-  // Replicate iq's terrain() function from the shader
-  const m2 = [1.6, -1.2, 1.2, 1.6];
-  const noised = (px, pz) => {
-    const p = [Math.floor(px), Math.floor(pz)];
-    const f = [px - p[0], pz - p[1]];
-    const u = [f[0]*f[0]*(3-2*f[0]), f[1]*f[1]*(3-2*f[1])];
-    const n = p[0] + p[1]*57;
-    const a = Math.sin(n+0)*43758.5453123, b = Math.sin(n+1)*43758.5453123;
-    const c = Math.sin(n+57)*43758.5453123, d = Math.sin(n+58)*43758.5453123;
-    const va = a - Math.floor(a), vb = b - Math.floor(b);
-    const vc = c - Math.floor(c), vd = d - Math.floor(d);
-    return va + (vb-va)*u[0] + (vc-va)*u[1] + (va-vb-vc+vd)*u[0]*u[1];
-  };
-  const fbm = (px, pz) => {
-    let f = 0;
-    f += 0.5*noised(px, pz); px = m2[0]*px + m2[1]*pz; pz = m2[2]*px + m2[3]*pz; px *= 2.02; pz *= 2.02;
-    f += 0.25*noised(px, pz); px = m2[0]*px + m2[1]*pz; pz = m2[2]*px + m2[3]*pz; px *= 2.03; pz *= 2.03;
-    f += 0.125*noised(px, pz); px = m2[0]*px + m2[1]*pz; pz = m2[2]*px + m2[3]*pz; px *= 2.01; pz *= 2.01;
-    f += 0.0625*noised(px, pz);
-    return f/0.9375;
-  };
-  const terrain = (px, pz) => {
-    let p = [px*0.003, pz*0.003];
-    let a = 0, b = 1;
-    for(let i=0; i<6; i++) {
-      const n = noised(p[0], p[1]);
-      a += b*n/(1.0);
-      b *= 0.5;
-      const np = [m2[0]*p[0] + m2[1]*p[1], m2[2]*p[0] + m2[3]*p[1]];
-      p = np;
-    }
-    return 140.0*a;
-  };
-  return terrain(x, z);
-}
-function addTree(x, z) {
-  const h = sampleHeightJS(x, z);
-  if (h < 5.0 || h > 60) return;
-  const s = 0.6 + Math.random() * 1.6;
-  const variant = Math.floor(Math.random() * foliageGeoms.length);
-  treeGroups.push({ x, z, h, s, variant });
-}
-function buildInstancedTrees() {
-  for (const t of treeGroups) {
-    if (treeGroups.length >= MAX_TREES) break;
-    let group = treePool.pop();
-    if (!group) group = new THREE.Group();
-    // clear previous children
-    while (group.children.length) group.remove(group.children[0]);
-    // trunk
-    const trunk = new THREE.Mesh(trunkGeom, trunkMat);
-    trunk.position.y = t.h + 1.1;
-    trunk.castShadow = false;
-    trunk.receiveShadow = false;
-    group.add(trunk);
-    // layered foliage (2-3 layers)
-    const numLayers = 2 + Math.floor(Math.random() * 2);
-    for (let l = 0; l < numLayers; l++) {
-      const gi = (t.variant + l) % foliageGeoms.length;
-      const foliage = new THREE.Mesh(foliageGeoms[gi], foliageMats[t.variant % foliageMats.length]);
-      foliage.position.y = t.h + 1.6 + l * 1.3;
-      // slight horizontal offset for natural look
-      foliage.position.x = (Math.random() - 0.5) * 0.3;
-      foliage.position.z = (Math.random() - 0.5) * 0.3;
-      foliage.castShadow = false;
-      foliage.receiveShadow = false;
-      group.add(foliage);
-    }
-    group.position.set(t.x, 0, t.z);
-    scene.add(group);
-  }
-}
-
-const rockGeom = new THREE.DodecahedronGeometry(0.45, 0);
-const rockMat = new THREE.MeshStandardMaterial({ color: '#6e685f', roughness: 0.7, flatShading: true });
-const rockInstanced = new THREE.InstancedMesh(rockGeom, rockMat, 2000);
-scene.add(rockInstanced);
-const groundData = [];
-function addGround(x, z) {
-  const h = sampleHeightJS(x, z);
-  if (h < 5.0 || h > 60) return;
-  if (Math.random() > 0.42) return;
-  const s = 0.5 + Math.random() * 2.2;
-  const rot = Math.random() * Math.PI * 2;
-  groundData.push({ x, z, h, s, rot, rock: Math.random() > 0.4 });
-}
-function buildGround() {
-  let ri = 0;
-  const dm = new THREE.Object3D();
-  for (const g of groundData) {
-    dm.position.set(g.x, g.h + (g.rock ? 0.14 : 0.28), g.z);
-    dm.scale.setScalar(g.s);
-    dm.rotation.set(g.rock ? 0 : 1.3, g.rot, g.rock ? g.rot : 0);
-    dm.updateMatrix();
-    if (g.rock && ri < 2000) rockInstanced.setMatrixAt(ri++, dm.matrix);
-  }
-  rockInstanced.count = ri;
-  rockInstanced.instanceMatrix.needsUpdate = true;
-}
-
-const step = 5.5;
-for (let x = -CHUNKS_RADIUS; x <= CHUNKS_RADIUS; x++) {
-  for (let z = -CHUNKS_RADIUS; z <= CHUNKS_RADIUS; z++) {
-    for (let lx = -CHUNK/2; lx < CHUNK/2; lx += step) {
-      for (let lz = -CHUNK/2; lz < CHUNK/2; lz += step) {
-        if (Math.random() > 0.52) continue;
-        const wx = x * CHUNK + lx + (Math.random() - 0.5) * step;
-        const wz = z * CHUNK + lz + (Math.random() - 0.5) * step;
-        addTree(wx, wz);
-        addGround(wx, wz);
-      }
-    }
-  }
-}
 // ============================================================
 // WALK STATE
 // ============================================================
 const state = { speed: 4.2, distance: 0, yaw: 0, pitch: 0.42, bob: 0, sway: 0 };
+
 // ============================================================
-// STARTUP — defer heavy work to first paint, then start the loop
+// STARTUP
 // ============================================================
 requestAnimationFrame(() => {
-  try {
-    buildInstancedTrees();
-    buildGround();
-    initRoad();
-  } finally {
-    loading.classList.add('hidden');
-    tick();
-  }
+  loading.classList.add('hidden');
+  tick();
 });
-// safety net: hide loading after 4s even if init stalls
 setTimeout(() => loading.classList.add('hidden'), 4000);
+
 let dragging = false;
 let prevMouse = { x: 0, y: 0 };
 canvas.addEventListener('pointerdown', (e) => { dragging = true; prevMouse.x = e.clientX; prevMouse.y = e.clientY; canvas.setPointerCapture(e.pointerId); });
@@ -870,10 +306,11 @@ window.addEventListener('wheel', (e) => {
   state.speed *= e.deltaY < 0 ? 1.08 : 0.92;
   state.speed = Math.max(1.0, Math.min(24, state.speed));
   paceEl.textContent = (state.speed / 4.2).toFixed(1) + 'x';
+  material.uniforms.uSpeed.value = state.speed / 4.2;
 }, { passive: true });
 
-// biome label
-const BIOME_NAMES = ['river valley','lowland meadow','mixed forest','high grass','rocky ridge','alpine snow'];
+// Biome classification
+const BIOME_NAMES = ['river valley', 'lowland meadow', 'mixed forest', 'high grass', 'rocky ridge', 'alpine snow'];
 function classifyBiome(h, slope) {
   if (h > 80 && slope < 0.25) return 'alpine snow';
   if (h > 60) return 'rocky ridge';
@@ -890,54 +327,58 @@ const clock = new THREE.Clock();
 function tick() {
   const dt = Math.min(clock.getDelta(), 0.1);
   const time = clock.elapsedTime;
+
   const fwd = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(0, state.yaw, 0));
   camera.position.addScaledVector(fwd, state.speed * dt);
   state.distance += state.speed * dt;
 
-  const ground = sampleHeightJS(camera.position.x, camera.position.z);
+  // Get terrain height at camera position
+  const camX = camera.position.x;
+  const camZ = camera.position.z;
+
+  // Sample height using the same terrain function
+  const m2 = [1.6, -1.2, 1.2, 1.6];
+  const noised = (px, pz) => {
+    const p = [Math.floor(px), Math.floor(pz)];
+    const f = [px - p[0], pz - p[1]];
+    const u = [f[0]*f[0]*(3-2*f[0]), f[1]*f[1]*(3-2*f[1])];
+    const n = p[0] + p[1]*57;
+    const a = Math.sin(n+0)*43758.5453123, b = Math.sin(n+1)*43758.5453123;
+    const c = Math.sin(n+57)*43758.5453123, d = Math.sin(n+58)*43758.5453123;
+    const va = a - Math.floor(a), vb = b - Math.floor(b);
+    const vc = c - Math.floor(c), vd = d - Math.floor(d);
+    return va + (vb-va)*u[0] + (vc-va)*u[1] + (va-vb-vc+vd)*u[0]*u[1];
+  };
+  const terrainJS = (px, pz) => {
+    let p = [px*0.003, pz*0.003];
+    let a = 0, b = 1;
+    for(let i=0; i<6; i++) {
+      const n = noised(p[0], p[1]);
+      a += b*n/(1.0);
+      b *= 0.5;
+      const np = [m2[0]*p[0] + m2[1]*p[1], m2[2]*p[0] + m2[3]*p[1]];
+      p = np;
+    }
+    return 140.0*a;
+  };
+  const ground = terrainJS(camX, camZ);
   const targetY = ground + 3.3;
   camera.position.y += (targetY - camera.position.y) * Math.min(dt * 4.0, 1);
+
   state.yaw += Math.sin(time * 0.25) * dt * 0.03;
 
-  camera.rotation.order = 'YXZ';
-  camera.rotation.y = state.yaw;
-  camera.rotation.x = state.pitch;
+  // Update shader uniforms
+  material.uniforms.uCameraPos.value.copy(camera.position);
+  const dir = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(state.pitch, state.yaw, 0));
+  material.uniforms.uCameraDir.value.copy(dir);
+  material.uniforms.uTime.value = time;
 
-  water.position.x = camera.position.x;
-  water.position.z = camera.position.z;
-  skyMesh.position.copy(camera.position);
-
-  const cx = Math.round(camera.position.x / CHUNK);
-  const cz = Math.round(camera.position.z / CHUNK);
-  desiredSet.clear();
-  for (let x = cx - CHUNKS_RADIUS; x <= cx + CHUNKS_RADIUS; x++)
-    for (let z = cz - CHUNKS_RADIUS; z <= cz + CHUNKS_RADIUS; z++) {
-      desiredSet.add(chunkKey(x, z));
-      ensureChunk(x, z);
-    }
-  for (const [key] of chunks) if (!desiredSet.has(key)) removeChunk(...key.split(',').map(Number));
-
-  const info = getRoadInfoAt(camera.position.x, camera.position.z);
-  if (info) {
-    const lateral = new THREE.Vector3().crossVectors(fwd, info.tangent).dot(new THREE.Vector3().crossVectors(fwd, info.right));
-    const softness = Math.max(0, 1 - Math.abs(info.dist) / (ROAD_WIDTH * 2.2));
-    const steer = Math.sin(time * 0.35) * 0.6 + Math.sin(time * 0.7) * 0.4;
-    const targetLateral = steer * softness * dt * 3.0;
-    camera.position.addScaledVector(info.right, targetLateral);
-    const bank = info.tangent.clone().cross(info.up).dot(info.right) * 0.35;
-    state.yaw += bank * dt * 0.5;
-  }
-
+  // Update UI
   distEl.textContent = (state.distance / 1000).toFixed(2);
-  elevEl.textContent = Math.round(ground * 10) / 10;
-  const hAhead = sampleHeightJS(camera.position.x + 1, camera.position.z);
+  elevEl.textContent = Math.round(ground);
+  const hAhead = terrainJS(camera.position.x + 1, camera.position.z);
   const slope = Math.min(Math.abs(hAhead - ground) / 3.0, 1.0);
-  biomeEl.textContent = classifyBiome(ground, Math.max(0, 1 - sampleHeightJS(camera.position.x+1, camera.position.z)));
-
-  terrainMaterial.uniforms.uTime.value = time;
-  waterMaterial.uniforms.uTime.value = time;
-  skyMaterial.uniforms.uTime.value = time;
-  if (roadMesh) roadMesh.material.uniforms.uTime.value = time;
+  biomeEl.textContent = classifyBiome(ground, Math.max(0, 1 - slope));
 
   renderer.render(scene, camera);
   requestAnimationFrame(tick);
@@ -947,6 +388,7 @@ window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  material.uniforms.uResolution.value.set(window.innerWidth, window.innerHeight);
 });
 </script>
 </body>
