@@ -55,8 +55,8 @@ async function init() {
     loading.textContent = 'LOADING SHADERS...';
 
     const [vertSrc, fragSrc] = await Promise.all([
-      loadShader('./shaders/terrain.vert.glsl'),
-      loadShader('./shaders/terrain.frag.glsl')
+      loadShader('./shaders/terrain.vert.js'),
+      loadShader('./shaders/terrain.frag.js')
     ]);
 
     material = new THREE.RawShaderMaterial({

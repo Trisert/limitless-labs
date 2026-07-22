@@ -14,8 +14,8 @@ def extract_shaders_from_js(filepath):
         content = f.read()
 
     # Find shader paths
-    vert_match = re.search(r"loadShader\('([^']+?\.vert\.glsl)'\)", content)
-    frag_match = re.search(r"loadShader\('([^']+?\.frag\.glsl)'\)", content)
+    vert_match = re.search(r"loadShader\('([^']+?\.vert\.js)'\)", content)
+    frag_match = re.search(r"loadShader\('([^']+?\.frag\.js)'\)", content)
 
     if not vert_match or not frag_match:
         print("ERROR: Could not find shader paths in", filepath)
