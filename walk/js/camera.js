@@ -83,7 +83,7 @@ function createWalkCamera() {
 
     return {
       pos: { x: cx, y: y + Math.sin(time * 3.0) * bob, z: cz },
-      dir: { x: dx/len, y: dy/len + bob * 1.5, z: dz/len }
+      dir: { x: dx/len, y: dy/len + bob * 1.5 - 0.12, z: dz/len }
     };
   }
 
