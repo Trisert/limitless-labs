@@ -143,6 +143,11 @@ float Map(in vec3 p) {
   return p.y - h;
 }
 
+float SimpleMap(in vec3 p) {
+  // Simple flat terrain for debugging
+  return p.y - 0.0;
+}
+
 float Terrain2(in vec2 p) {
   vec2 pos = p*0.05;
   float w = (Noise(pos*.25)*0.75+.15);
@@ -239,7 +244,7 @@ bool Scene(in vec3 rO, in vec3 rD, out float resT, in vec2 fragCoord) {
   for(int j=0; j< 150; j++) {
     if (fin || t > 240.0) break;
     vec3 p = rO + t*rD;
-    float h = Map(p);
+    float h = SimpleMap(p);
     if(h < 0.5) {
       fin = true;
       distances = vec2(oldT, t);
