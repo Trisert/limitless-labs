@@ -24,7 +24,7 @@ uniform vec3 uCameraPos;
 uniform vec3 uCameraDir;
 uniform float uTime;
 uniform vec2 uResolution;
-const float WATER_LEVEL = 0.0;
+const float WATER_LEVEL = 2.5;
 const float SNOW_LEVEL = 70.0;
 const vec3 SUN_DIR = normalize(vec3(-0.55, 0.04, 0.7));
 const vec3 SUN_COLOR = vec3(1.0, 0.5, 0.06);
@@ -72,6 +72,11 @@ float Terrain(in vec2 p) {
   }
   float ff = Noise(pos*.002);
   f += pow(abs(ff), 5.0)*275.-5.0;
+  float distFromCenter = length(p);
+  float lakeRadius = 10.0;
+  float lakeDepth = 4.0;
+  float lake = smoothstep(lakeRadius, lakeRadius*0.3, distFromCenter) * lakeDepth;
+  f -= lake;
   return f;
 }
 float treeLine;

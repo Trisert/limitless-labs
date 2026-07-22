@@ -1,8 +1,8 @@
 // Camera — viewpoint from refuge terrace with slow panoramic pan
 // Reference: Yosemite Valley View at dawn
 export function createCameraController() {
-  const basePos = { x: 0.0, y: 8.0, z: 45.0 };
-  const baseDir = { x: 0.0, y: -0.06, z: -1.0 };
+  const basePos = { x: 0.0, y: 5.5, z: 30.0 };
+  const baseDir = { x: 0.0, y: -0.08, z: -1.0 };
 
   let time = 0;
 
