@@ -377,6 +377,7 @@ const eagle = {
 function tick() {
   try {
     const time = clock.elapsedTime;
+    console.log('tick:', time.toFixed(3));
     eagle.t = time * eagle.speed;
     const t = eagle.t;
     
@@ -399,11 +400,6 @@ function tick() {
     material.uniforms.uCameraPos.value.set(camX, 40, camZ);
     material.uniforms.uCameraDir.value.copy(forward);
     material.uniforms.uTime.value = time;
-    
-    // Log position every ~2 sec for debug
-    if (Math.floor(time / 2) !== Math.floor((time - 0.017) / 2)) {
-      console.log('pos:', camX.toFixed(0), camZ.toFixed(0), 'fwd:', forward.x.toFixed(2), forward.z.toFixed(2));
-    }
     
     renderer.render(scene, camera);
     requestAnimationFrame(tick);
