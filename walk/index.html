@@ -293,7 +293,7 @@ float BinarySubdivision(in vec3 rO, in vec3 rD, vec2 t) {
 }
 
 bool Scene(in vec3 rO, in vec3 rD, out float resT, in vec2 fragCoord) {
-  float t = 1. + Hash12(fragCoord.xy)*1.;
+  float t = 0.1;
   float oldT = 0.0;
   float delta = 0.0;
   bool fin = false;
