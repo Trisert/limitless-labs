@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createCameraController } from './camera.js';
+import { getCameraUpdate, switchCamera, getCameraLabel, getActiveMode } from './camera.js';
 import { terrainHeight, WATER_LEVEL } from './terrain.js';
 
 // ============ SHADER LOADING ============
@@ -350,7 +350,6 @@ geo.setAttribute('uv', new THREE.Float32BufferAttribute([0, 2, 0, 0, 2, 0], 2));
 
 // ============ MATERIAL & UNIFORMS ============
 let material;
-let cameraController;
 
 async function init() {
   try {
@@ -384,7 +383,7 @@ async function init() {
     const mesh = new THREE.Mesh(geo, material);
     scene.add(mesh);
 
-    cameraController = createCameraController();
+    // Camera controller is managed by camera.js module — no instance needed
 
     loading.textContent = 'GENERATING WORLD...';
 
@@ -401,6 +400,45 @@ async function init() {
   }
 }
 
+// ============ UI — CAMERA SWITCH ============
+function createUI() {
+  const btn = document.createElement('button');
+  btn.id = 'cam-toggle';
+  btn.textContent = '🎥 ' + getCameraLabel();
+  btn.style.cssText = `
+    position:fixed;bottom:24px;right:24px;z-index:30;
+    padding:8px 16px;border:1px solid rgba(224,167,67,0.4);border-radius:6px;
+    background:rgba(11,13,15,0.75);color:#e0a743;
+    font:12px/1.4 ui-monospace,monospace;cursor:pointer;
+    backdrop-filter:blur(4px);transition:opacity .3s;
+    opacity:0;pointer-events:none;
+  `;
+  btn.onmouseenter = () => { btn.style.borderColor = 'rgba(224,167,67,0.8)'; };
+  btn.onmouseleave = () => { btn.style.borderColor = 'rgba(224,167,67,0.4)'; };
+  btn.onclick = () => {
+    const next = getActiveMode() === 'refuge' ? 'walk' : 'refuge';
+    switchCamera(next);
+    btn.textContent = '🎥 ' + getCameraLabel();
+  };
+  document.body.appendChild(btn);
+  return btn;
+}
+
+let camBtn;
+
+// Show UI after canvas is ready
+const origReady = canvas.classList.add.bind(canvas.classList);
+canvas.classList.add = function(cls) {
+  origReady(cls);
+  if (cls === 'ready' && !camBtn) {
+    camBtn = createUI();
+    requestAnimationFrame(() => {
+      camBtn.style.opacity = '1';
+      camBtn.style.pointerEvents = 'auto';
+    });
+  }
+};
+
 // ============ RENDER LOOP ============
 let lastTime = performance.now();
 let totalTime = 0;
@@ -413,7 +451,7 @@ function tick() {
     totalTime += dt;
 
     // Update camera
-    const cam = cameraController.update(dt);
+    const cam = getCameraUpdate(dt);
     material.uniforms.uCameraPos.value.set(cam.pos.x, cam.pos.y, cam.pos.z);
     material.uniforms.uCameraDir.value.set(cam.dir.x, cam.dir.y, cam.dir.z).normalize();
     material.uniforms.uTime.value = totalTime;
