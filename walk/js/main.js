@@ -139,19 +139,19 @@ vec3 GetClouds(in vec3 sky, in vec3 rd) {
   return sky;
 }
 vec3 ApplyFog(in vec3 rgb, in float dis, in vec3 dir) {
-  float heightFog = exp(-max(uCameraPos.y - 5.0, 0.0) * 0.02);
-  float distFog = exp(-dis * 0.00004);
+  float heightFog = exp(-max(uCameraPos.y - 5.0, 0.0) * 0.005);
+  float distFog = exp(-dis * 0.000015);
   float fogAmount = distFog * heightFog;
   float sunAmt = max(dot(dir, SUN_DIR), 0.0);
-  vec3 fogCol = mix(vec3(0.4, 0.45, 0.6), vec3(1.0, 0.7, 0.4), sunAmt * 0.5);
+  vec3 fogCol = mix(vec3(0.45, 0.5, 0.65), vec3(1.0, 0.75, 0.5), sunAmt * 0.4);
   return mix(fogCol, rgb, fogAmount);
 }
 float VolumetricFog(in vec3 pos, in vec3 rd, in float dis) {
-  if (dis > 200.0) return 0.0;
+  if (dis > 300.0) return 0.0;
   float density = Noise(pos.xz * 0.02 + uTime * 0.01) * 0.5 + 0.5;
-  density *= smoothstep(50.0, 0.0, pos.y);
-  density *= smoothstep(200.0, 50.0, dis);
-  return density * 0.3;
+  density *= smoothstep(30.0, 0.0, pos.y);
+  density *= smoothstep(300.0, 80.0, dis);
+  return density * 0.06;
 }
 float specular = 0.0;
 float ambient = 0.25;
