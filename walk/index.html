@@ -199,7 +199,7 @@ vec3 GetSky(in vec3 rd) {
 
 vec3 ApplyFog(in vec3 rgb, in float dis, in vec3 dir) {
   float fogAmount = exp(-dis * 0.00005);
-  return mix(GetSky(dir), rgb, fogAmount);
+  return mix(vec3(0.5, 0.6, 0.9), rgb, fogAmount);
 }
 
 void DoLighting(inout vec3 mat, in vec3 pos, in vec3 normal, in vec3 eyeDir, in float dis) {
