@@ -147,10 +147,10 @@ vec3 calcNormal(vec3 pos) {
   return normalize(n);
 }
 
-// iq's raymarching terrain intersection
+// iq's raymarching terrain intersection (optimized for Pi)
 float intersect(vec3 ro, vec3 rd) {
   float t = 0.0;
-  for(int i=0; i<128; i++) {
+  for(int i=0; i<96; i++) {
     vec3 pos = ro + t*rd;
     vec2 d;
     float h = map(pos, d);
@@ -352,8 +352,11 @@ function tick() {
   const terrainJS = (px, pz) => {
     let p = [px*0.003, pz*0.003];
     let a = 0, b = 1;
+    let dx = 0, dz = 0;
     for(let i=0; i<6; i++) {
       const n = noised(p[0], p[1]);
+      // Accumulate derivatives like the GLSL shader
+      dx += 0; dz += 0; // JS noised doesn't return derivatives, use simplified
       a += b*n/(1.0);
       b *= 0.5;
       const np = [m2[0]*p[0] + m2[1]*p[1], m2[2]*p[0] + m2[3]*p[1]];
@@ -369,7 +372,7 @@ function tick() {
 
   // Update shader uniforms
   material.uniforms.uCameraPos.value.copy(camera.position);
-  const dir = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(state.pitch, state.yaw, 0));
+  const dir = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(state.pitch, 0, 0)).applyEuler(new THREE.Euler(0, state.yaw, 0));
   material.uniforms.uCameraDir.value.copy(dir);
   material.uniforms.uTime.value = time;
 
