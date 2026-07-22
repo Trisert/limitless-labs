@@ -68,12 +68,11 @@ float Terrain(in vec2 p) {
   float ff = Noise(pos*.002);
   f += pow(abs(ff), 5.0)*275.-5.0;
   
-  // Carve a lake basin at origin
+  // Carve a lake basin at origin — force terrain to water level
   float distFromCenter = length(p);
-  float lakeRadius = 10.0;
-  float lakeDepth = 4.0;
-  float lake = smoothstep(lakeRadius, lakeRadius*0.3, distFromCenter) * lakeDepth;
-  f -= lake;
+  float lakeRadius = 16.0;
+  float lakeBlend = 1.0 - smoothstep(0.0, lakeRadius, distFromCenter);
+  f = mix(f, WATER_LEVEL - 0.3, lakeBlend);
   
   return f;
 }
