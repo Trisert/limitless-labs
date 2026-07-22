@@ -231,19 +231,9 @@ vec3 TerrainColour(vec3 pos, vec3 normal, float dis) {
   }
   float distToWater = pos.y - WATER_LEVEL;
   if (distToWater < 1.0 && distToWater > -2.0) {
-    float time = uTime * 0.03;
-    vec3 watPos = pos;
-    float wave1 = Noise(watPos.xz * 0.8 + time * 2.0);
-    float wave2 = Noise(watPos.xz * 3.0 - time * 1.5);
-    vec3 waterNor = normalize(vec3(wave1 * 0.08, 1.0, wave2 * 0.08));
-    mat = GetWaterColor(pos, dir, waterNor, dis);
-    float foam = smoothstep(1.0, 0.0, abs(distToWater));
-    foam *= Noise(pos.xz * 15.0 + uTime * 0.3);
-    mat = mix(mat, vec3(0.85, 0.92, 0.95), foam * 0.25);
-    DoLighting(mat, pos, waterNor, dir, disSqrd);
-  } else {
-    DoLighting(mat, pos, normal, dir, disSqrd);
-  }
+    mat = vec3(0.0, 0.0, 1.0);
+    return mat;
+  } else {\n    DoLighting(mat, pos, normal, dir, disSqrd);\n  }
   mat = ApplyFog(mat, disSqrd, dir);
   float volFog = VolumetricFog(pos, dir, dis);
   if (volFog > 0.0) {
