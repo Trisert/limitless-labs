@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Walk — Limitless Labs</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23e0a743'/></svg>">
+<link rel="stylesheet" href="/limitless-labs/style.css?v=3">
+<style id="walk-inline-css">
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#0b0d0f}
+  #walk-canvas{position:fixed;inset:0;display:block;width:100%;height:100%;opacity:0;transition:opacity .3s}
+  #walk-canvas.ready{opacity:1}
+  .loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0b0d0f;color:#e0a743;font:14px/1.2 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;z-index:20;transition:opacity .8s}
+  .loading.hidden{opacity:0;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="walk-canvas" aria-label="Procedural infinite walk through a national park landscape"></canvas>
+<div class="loading" id="loading">GENERATING WORLD...</div>
+
+<script type="importmap">
+{ "imports": { "three": "../vendor/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+const canvas = document.getElementById('walk-canvas');
+const loading = document.getElementById('loading');
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+if (!renderer.capabilities.isWebGL2) {
+  loading.textContent = 'WEBGL UNAVAILABLE — try a modern browser';
+}
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0xff00ff, 1); // Magenta — if you see magenta, shader isn't drawing
+renderer.shadowMap.enabled = false;
+// renderer.toneMapping = THREE.ACESFilmicToneMapping;
+// renderer.toneMappingExposure = 1.45;
+// renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.onerror = (e) => { console.error('WebGL error:', e); loading.textContent = 'RENDER ERROR — refresh'; };
+console.log('WebGL renderer initialized');
+
+const scene = new THREE.Scene();
+const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+camera.position.set(0, 0, 0);
+camera.lookAt(0, 0, -1);
+camera.updateMatrixWorld();
+
+// ============================================================
+// SHADER — fullscreen quad using triangle (Three.js standard approach)
+// Based on FullScreenQuad from three/addons/postprocessing/Pass.js
+// ============================================================
+
+const vertexShader = `
+varying vec2 vUv;
+void main() {
+  vUv = uv;
+  gl_Position = vec4(position.xy, 0.0, 1.0);
+}
+`;
+
+const fragmentShader = `
+varying vec2 vUv;
+uniform vec3 uCameraPos;
+uniform vec3 uCameraDir;
+uniform float uTime;
+uniform vec2 uResolution;
+
+vec3 sunLight = normalize(vec3(-0.55, 0.04, 0.7));
+vec3 sunColour = vec3(1.0, 0.5, 0.06);
+float specular = 0.0;
+float ambient = 0.25;
+vec2 add = vec2(1.0, 0.0);
+#define HASHSCALE1 .1031
+#define HASHSCALE3 vec3(.1031, .1030, .0973)
+
+const mat2 rotate2D = mat2(1.3623, 1.7531, -1.7131, 1.4623);
+
+float Hash12(vec2 p) {
+  vec3 p3 = fract(vec3(p.xyx) * HASHSCALE1);
+  p3 += dot(p3, p3.yzx + 19.19);
+  return fract((p3.x + p3.y) * p3.z);
+}
+
+vec2 Hash22(vec2 p) {
+  vec3 p3 = fract(vec3(p.xyx) * HASHSCALE3);
+  p3 += dot(p3, p3.yzx + 19.19);
+  return fract((p3.xx + p3.yz) * p3.zy);
+}
+
+float Noise(in vec2 x) {
+  vec2 p = floor(x);
+  vec2 f = fract(x);
+  f = f*f*(3.0-2.0*f);
+  float res = mix(mix(Hash12(p), Hash12(p + add.xy), f.x),
+                  mix(Hash12(p + add.yx), Hash12(p + add.xx), f.x), f.y);
+  return res;
+}
+
+vec2 Noise2(in vec2 x) {
+  vec2 p = floor(x);
+  vec2 f = fract(x);
+  f = f*f*(3.0-2.0*f);
+  vec2 res = mix(mix(Hash22(p), Hash22(p + add.xy), f.x),
+                 mix(Hash22(p + add.yx), Hash22(p + add.xx), f.x), f.y);
+  return res;
+}
+
+float Trees(vec2 p) {
+  return Noise(p*13.0) * 0.15;
+}
+
+float Terrain(in vec2 p) {
+  vec2 pos = p*0.05;
+  float w = (Noise(pos*.25)*0.75+.15);
+  w = 66.0 * w * w;
+  float f = .0;
+  for (int i = 0; i < 5; i++) {
+    f += w * Noise(pos);
+    w = -w * 0.4;
+    pos = rotate2D * pos;
+  }
+  float ff = Noise(pos*.002);
+  f += pow(abs(ff), 5.0)*275.-5.0;
+  return f;
+}
+
+float treeLine;
+float treeCol;
+
+float Map(in vec3 p) {
+  float h = Terrain(p.xz);
+  float ff = Noise(p.xz*.3) + Noise(p.xz*3.3)*.5;
+  treeLine = smoothstep(ff, .0+ff*2.0, h) * smoothstep(1.0+ff*3.0, .4+ff, h);
+  treeCol = Trees(p.xz);
+  h += treeCol;
+  return p.y - h;
+}
+
+float Terrain2(in vec2 p) {
+  vec2 pos = p*0.05;
+  float w = (Noise(pos*.25)*0.75+.15);
+  w = 66.0 * w * w;
+  float f = .0;
+  for (int i = 0; i < 5; i++) {
+    f += w * Noise(pos);
+    w = -w * 0.4;
+    pos = rotate2D * pos;
+  }
+  float ff = Noise(pos*.002);
+  f += pow(abs(ff), 5.0)*275.-5.0;
+  treeCol = Trees(p);
+  f += treeCol;
+  if (treeCol > 0.0) return f;
+  for (int i = 0; i < 6; i++) {
+    f += w * Noise(pos);
+    w = -w * 0.4;
+    pos = rotate2D * pos;
+  }
+  return f;
+}
+
+float FractalNoise(in vec2 xy) {
+  float w = .7;
+  float f = 0.0;
+  for (int i = 0; i < 4; i++) {
+    f += Noise(xy) * w;
+    w *= 0.5;
+    xy *= 2.7;
+  }
+  return f;
+}
+
+vec3 GetClouds(in vec3 sky, in vec3 rd) {
+  if (rd.y < 0.01) return sky;
+  float v = (200.0-uCameraPos.y)/rd.y;
+  rd.xz *= v;
+  rd.xz += uCameraPos.xz;
+  rd.xz *= .010;
+  float f = (FractalNoise(rd.xz) -.55) * 5.0;
+  sky = mix(sky, vec3(.55, .55, .52), clamp(f*rd.y-.1, 0.0, 1.0));
+  return sky;
+}
+
+vec3 GetSky(in vec3 rd) {
+  float sunAmount = max(dot(rd, sunLight), 0.0);
+  float horiz = pow(1.0 - max(rd.y, 0.0), 4.0);
+  float zenith = 1.0 - horiz;
+  
+  // Dawn sky: warm orange on horizon -> purple/magenta mid -> deep blue zenith
+  vec3 horizonCol = vec3(0.9, 0.35, 0.08) * 1.2;  // bright orange
+  vec3 zenithCol = vec3(0.08, 0.12, 0.45);         // deep blue
+  
+  vec3 sky = mix(zenithCol, horizonCol, horiz * 0.8);
+  
+  // Sun glow — wide warm halo
+  sky += vec3(1.0, 0.6, 0.15) * pow(sunAmount, 3.0) * 0.6;
+  // Sun disc
+  sky += vec3(1.0, 0.9, 0.5) * min(pow(sunAmount, 600.0), 0.5) * 0.8;
+  
+  return sky;
+}
+
+vec3 ApplyFog(in vec3 rgb, in float dis, in vec3 dir) {
+  float fogAmount = exp(-dis * 0.00005);
+  return mix(GetSky(dir), rgb, fogAmount);
+}
+
+void DoLighting(inout vec3 mat, in vec3 pos, in vec3 normal, in vec3 eyeDir, in float dis) {
+  float h = dot(sunLight, normal);
+  float c = max(h, 0.0) + ambient;
+  mat = mat * sunColour * c;
+  if (h > 0.0) {
+    vec3 R = reflect(sunLight, normal);
+    float specAmount = pow(max(dot(R, normalize(eyeDir)), 0.0), 3.0) * specular;
+    mat = mix(mat, sunColour, specAmount);
+  }
+}
+
+vec3 TerrainColour(vec3 pos, vec3 normal, float dis) {
+  vec3 mat;
+  specular = .0;
+  ambient = .1;
+  vec3 dir = normalize(pos - uCameraPos);
+  vec3 matPos = pos * 2.0;
+  float disSqrd = dis * dis;
+  float f = clamp(Noise(matPos.xz*.05), 0.0, 1.0);
+  f += Noise(matPos.xz*.1 + normal.yz*1.08)*.85;
+  f *= .55;
+  vec3 m = mix(vec3(.63*f+.2, .7*f+.1, .7*f+.1), vec3(f*.43+.1, f*.3+.2, f*.35+.1), f*.65);
+  mat = m*vec3(f*m.x+.36, f*m.y+.30, f*m.z+.28);
+  if (normal.y < .5) {
+    float v = normal.y;
+    float c = (.5-normal.y) * 4.0;
+    c = clamp(c*c, 0.1, 1.0);
+    f = Noise(vec2(matPos.x*.09, matPos.z*.095+matPos.yy*0.15));
+    f += Noise(vec2(matPos.x*2.233, matPos.z*2.23))*0.5;
+    mat = mix(mat, vec3(.4*f), c);
+    specular += .1;
+  }
+  if (matPos.y < 45.35 && normal.y > .65) {
+    m = vec3(Noise(matPos.xz*.023)*.5+.15, Noise(matPos.xz*.03)*.6+.25, 0.0);
+    m *= (normal.y - 0.65)*.6;
+    mat = mix(mat, m, clamp((normal.y-.65)*1.3 * (45.35-matPos.y)*0.1, 0.0, 1.0));
+  }
+  if (treeCol > 0.0) {
+    mat = vec3(.02+Noise(matPos.xz*5.0)*.03, .05, .0);
+    specular = .0;
+  }
+  if (matPos.y > 80.0 && normal.y > .42) {
+    float snow = clamp((matPos.y - 80.0 - Noise(matPos.xz * .1)*28.0) * 0.035, 0.0, 1.0);
+    mat = mix(mat, vec3(.7,.7,.8), snow);
+    specular += snow;
+    ambient += snow *.3;
+  }
+  if (matPos.y < 1.45) {
+    if (normal.y > .4) {
+      f = Noise(matPos.xz * .084)*1.5;
+      f = clamp((1.45-f-matPos.y) * 1.34, 0.0, .67);
+      float t = (normal.y-.4);
+      t = (t*t);
+      mat = mix(mat, vec3(.09+t, .07+t, .03+t), f);
+    }
+    if (matPos.y < 0.0) {
+      mat *= .2;
+    }
+  }
+  DoLighting(mat, pos, normal, dir, disSqrd);
+  if (matPos.y < 0.0) {
+    float time = (uTime)*.03;
+    vec3 watPos = matPos;
+    watPos += -dir * (watPos.y/dir.y);
+    float tx = cos(watPos.x*.052) *4.5;
+    float tz = sin(watPos.z*.072) *4.5;
+    vec2 co = Noise2(vec2(watPos.x*4.7+1.3+tz, watPos.z*4.69+time*35.0-tx));
+    co += Noise2(vec2(watPos.z*8.6+time*13.0-tx, watPos.x*8.712+tz))*.4;
+    vec3 nor = normalize(vec3(co.x, 20.0, co.y));
+    nor = normalize(reflect(dir, nor));
+    tx = watPos.y-matPos.y;
+    mat = mix(mat, GetClouds(GetSky(nor)*vec3(.3,.3,.5), nor)*.1+vec3(.0,.02,.03), clamp((tx)*.4, .6, 1.));
+    mat += vec3(.1)*clamp(1.-pow(tx+.5, 3.), 0.,1.0);
+    float sunAmount = max(dot(nor, sunLight), 0.0);
+    mat = mat + sunColour * pow(sunAmount, 228.5)*.6;
+  }
+  mat = ApplyFog(mat, disSqrd, dir);
+  return mat;
+}
+
+float BinarySubdivision(in vec3 rO, in vec3 rD, vec2 t) {
+  float halfwayT;
+  for (int i = 0; i < 5; i++) {
+    halfwayT = dot(t, vec2(.5));
+    float d = Map(rO + halfwayT*rD);
+    t = mix(vec2(t.x, halfwayT), vec2(halfwayT, t.y), step(0.5, d));
+  }
+  return halfwayT;
+}
+
+bool Scene(in vec3 rO, in vec3 rD, out float resT, in vec2 fragCoord) {
+  float t = 0.1;
+  float oldT = 0.0;
+  float delta = 0.0;
+  bool fin = false;
+  vec2 distances;
+  for(int j=0; j< 150; j++) {
+    if (fin || t > 240.0) break;
+    vec3 p = rO + t*rD;
+    float h = Map(p);
+    if(h < 0.5) {
+      fin = true;
+      distances = vec2(oldT, t);
+      break;
+    }
+    delta = max(0.01, 0.3*h) + (t*0.0065);
+    oldT = t;
+    t += delta;
+  }
+  if (fin) resT = BinarySubdivision(rO, rD, distances);
+  return fin;
+}
+
+void main() {
+  vec2 xy = vUv * 2.0 - 1.0;
+  xy.x *= uResolution.x / uResolution.y;
+
+  vec3 ro = uCameraPos;
+  vec3 ta = ro + uCameraDir;
+
+  vec3 cw = normalize(ta - ro);
+  vec3 cp = vec3(0.0, 1.0, 0.0);
+  vec3 cu = normalize(cross(cw, cp));
+  vec3 cv = normalize(cross(cu, cw));
+  vec3 rd = normalize(xy.x * cu + xy.y * cv + 1.5 * cw);
+
+  vec3 col;
+  float distance;
+  if(!Scene(ro, rd, distance, vUv * uResolution)) {
+    col = vec3(0.5, 0.6, 0.9) * (0.6 + 0.4 * max(rd.y, 0.0));
+  } else {
+    vec3 pos = ro + distance * rd;
+    float p = .02 + .00005 * distance * distance;
+    vec3 nor = vec3(0.0, Terrain2(pos.xz), 0.0);
+    vec3 v2 = nor - vec3(p, Terrain2(pos.xz + vec2(p, 0.0)), 0.0);
+    vec3 v3 = nor - vec3(0.0, Terrain2(pos.xz + vec2(0.0, -p)), -p);
+    nor = normalize(cross(v2, v3));
+    col = TerrainColour(pos, nor, distance);
+  }
+
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
+const material = new THREE.ShaderMaterial({
+  vertexShader,
+  fragmentShader,
+  uniforms: {
+    uCameraPos: { value: new THREE.Vector3(0, 40.0, 40) },
+    uCameraDir: { value: new THREE.Vector3(0, -0.3, -1).normalize() },
+    uTime: { value: 0 },
+    uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+  },
+  side: THREE.DoubleSide,
+});
+
+// Fullscreen triangle (Three.js standard approach — covers entire screen)
+const geo = new THREE.BufferGeometry();
+geo.setAttribute('position', new THREE.Float32BufferAttribute([-1, 3, 0, -1, -1, 0, 3, -1, 0], 3));
+geo.setAttribute('uv', new THREE.Float32BufferAttribute([0, 2, 0, 0, 2, 0], 2));
+
+const quad = new THREE.Mesh(geo, material);
+scene.add(quad);
+
+// ============================================================
+// LOOP — eagle flight over terrain
+// ============================================================
+
+// Terrain height sampling (Hoskins' noise replicated in JS)
+const rot2D = [1.3623, 1.7531, -1.7131, 1.4623];
+function hash12(px, py) {
+  let p3x = (px * 0.1031) % 1; if(p3x < 0) p3x += 1;
+  let p3y = (py * 0.1031) % 1; if(p3y < 0) p3y += 1;
+  const d = p3x * p3y + p3y * p3x + 19.19 * (p3x + p3y);
+  return d - Math.floor(d);
+}
+function noise2d(x, y) {
+  const ix = Math.floor(x)|0, iy = Math.floor(y)|0;
+  const fx = x - ix, fy = y - iy;
+  const ux = fx*fx*(3-2*fx), uy = fy*fy*(3-2*fy);
+  const h1 = hash12(ix, iy);
+  const h2 = hash12(ix+1, iy);
+  const h3 = hash12(ix, iy+1);
+  const h4 = hash12(ix+1, iy+1);
+  return h1 + (h2-h1)*ux + (h3-h1)*uy + (h1-h2-h3+h4)*ux*uy;
+}
+function terrainJS(x, z) {
+  let px = x * 0.05, pz = z * 0.05;
+  let w = (noise2d(px*0.25, pz*0.25) * 0.75 + 0.15);
+  w = 66.0 * w * w;
+  let f = 0.0;
+  for (let i = 0; i < 5; i++) {
+    f += w * noise2d(px, pz);
+    w = -w * 0.4;
+    const nx = rot2D[0]*px + rot2D[1]*pz;
+    const nz = rot2D[2]*px + rot2D[3]*pz;
+    px = nx; pz = nz;
+  }
+  f += Math.pow(Math.abs(noise2d(px*0.002, pz*0.002)), 5.0) * 275 - 5.0;
+  return f;
+}
+
+// Camera path
+const pathRadius = 220;
+const pathSpeed = 0.008;
+let lastTime = performance.now();
+let totalTime = 0;
+
+function tick() {
+  try {
+    const now = performance.now();
+    totalTime += (now - lastTime) / 1000;
+    lastTime = now;
+    const t = totalTime * pathSpeed;
+
+    // Wide gentle path — overlapping ellipses
+    const camX = pathRadius * Math.sin(t * 0.7) * Math.cos(t * 0.4);
+    const camZ = pathRadius * Math.sin(t * 0.9) * Math.cos(t * 0.3);
+
+    // Scan terrain heights in a ring around the path point
+    // Take the maximum to guarantee no clipping
+    let maxH = -100;
+    for (let i = 0; i < 8; i++) {
+      const angle = i * 0.785; // 45° increments
+      const sx = camX + Math.cos(angle) * 35;
+      const sz = camZ + Math.sin(angle) * 35;
+      const h = terrainJS(sx, sz);
+      if (h > maxH) maxH = h;
+    }
+    const camY = Math.max(maxH + 50, 30);
+
+    // Look ahead along the path
+    const lT = (totalTime + 1.5) * pathSpeed;
+    const lX = pathRadius * Math.sin(lT * 0.7) * Math.cos(lT * 0.4);
+    const lZ = pathRadius * Math.sin(lT * 0.9) * Math.cos(lT * 0.3);
+
+    // Camera looks forward and slightly down (bird's eye)
+    const fwd = new THREE.Vector3(lX - camX, 0, lZ - camZ).normalize();
+    const dir = new THREE.Vector3(fwd.x, -0.25, fwd.z).normalize();
+
+    material.uniforms.uCameraPos.value.set(camX, camY, camZ);
+    material.uniforms.uCameraDir.value.copy(dir);
+    material.uniforms.uTime.value = totalTime;
+
+    renderer.render(scene, camera);
+    requestAnimationFrame(tick);
+  } catch(e) {
+    console.error('CRITICAL ERROR in tick():', e);
+    loading.textContent = 'RUNTIME ERROR — check console';
+    loading.style.opacity = 1;
+    loading.style.pointerEvents = 'auto';
+  }
+}
+
+requestAnimationFrame(() => {
+  canvas.classList.add('ready');
+  loading.classList.add('hidden');
+  tick();
+});
+setTimeout(() => loading.classList.add('hidden'), 4000);
+
+window.addEventListener('resize', () => {
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  material.uniforms.uResolution.value.set(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
