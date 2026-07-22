@@ -82,8 +82,8 @@ def validate_shader(shader, name):
         errors.append(f"  Unbalanced parentheses (depth={depth})")
     
     # Check for gl_FragColor in fragment shader
-    if name == "fragment" and 'gl_FragColor' not in shader:
-        errors.append("  Missing gl_FragColor output")
+    if name == "fragment" and 'gl_FragColor' not in shader and 'out vec4' not in shader:
+        errors.append("  Missing fragment shader output (gl_FragColor or out vec4)")
     
     return errors
 
