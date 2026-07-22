@@ -192,6 +192,7 @@ void main() {
     vec3 snow = vec3(0.95, 0.96, 0.98);
 
     // Detail noise
+    vec2 d;
     float r = fbm(pos.xz * 7.0);
     vec3 col_terrain = (r * 0.25 + 0.75) * 0.9 * mix(
       vec3(0.08, 0.05, 0.03),
