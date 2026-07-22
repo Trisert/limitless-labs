@@ -40,8 +40,8 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.onerror = (e) => { console.error('WebGL error:', e); loading.textContent = 'RENDER ERROR — refresh'; };
 
 const scene = new THREE.Scene();
-const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
-camera.position.set(0, 0, 1);
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1.0, 1200);
+camera.position.set(0, 85, 90);
 
 // ============================================================
 // SHADER — fullscreen quad with raymarching
@@ -260,11 +260,28 @@ const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material);
 scene.add(quad);
 
 // ============================================================
-// LOOP — static view, just animate time
+// LOOP — birdeye camera with smooth orbit
 // ============================================================
 const clock = new THREE.Clock();
+const birdState = { angle: 0, radius: 90, height: 85, speed: 0.02 };
+
 function tick() {
-  material.uniforms.uTime.value = clock.elapsedTime;
+  const time = clock.elapsedTime;
+  
+  // Birdeye camera: orbit around origin at high altitude
+  birdState.angle += birdState.speed * 0.3;
+  const camX = Math.cos(birdState.angle) * birdState.radius;
+  const camZ = Math.sin(birdState.angle) * birdState.radius;
+  camera.position.set(camX, birdState.height, camZ);
+  
+  // Look at center (birdeye view)
+  camera.lookAt(0, 0, 0);
+  camera.updateMatrixWorld();
+  
+  material.uniforms.uCameraPos.value.set(camX, birdState.height, camZ);
+  material.uniforms.uCameraDir.value.set(-camX, -birdState.height, -camZ).normalize();
+  material.uniforms.uTime.value = time;
+  
   renderer.render(scene, camera);
   requestAnimationFrame(tick);
 }
