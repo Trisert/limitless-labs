@@ -33,7 +33,7 @@ if (!renderer.capabilities.isWebGL2) {
 }
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setClearColor(0x0000ff, 1); // Blue clear — if this shows, WebGL works
+renderer.setClearColor(0xff00ff, 1); // Magenta — if you see magenta, shader isn't drawing
 renderer.shadowMap.enabled = false;
 // renderer.toneMapping = THREE.ACESFilmicToneMapping;
 // renderer.toneMappingExposure = 1.45;
@@ -52,21 +52,16 @@ camera.updateMatrixWorld();
 // Based on iq's techniques from Shadertoy "Elevated"
 // ============================================================
 
-const vertexShader = `#version 300 es
-layout(location = 0) in vec3 position;
-layout(location = 1) in vec2 uv;
-out vec2 vUv;
+const vertexShader = `
+varying vec2 vUv;
 void main() {
   vUv = uv;
   gl_Position = vec4(position.xy, 0.0, 1.0);
 }
 `;
 
-const fragmentShader = `#version 300 es
-precision highp float;
-in vec2 vUv;
-out vec4 fragColor;
-
+const fragmentShader = `
+varying vec2 vUv;
 uniform vec3 uCameraPos;
 uniform vec3 uCameraDir;
 uniform float uTime;
@@ -342,11 +337,11 @@ void main() {
     col = TerrainColour(pos, nor, distance);
   }
 
-  fragColor = vec4(col, 1.0);
+  gl_FragColor = vec4(col, 1.0);
 }
 `;
 
-const material = new THREE.RawShaderMaterial({
+const material = new THREE.ShaderMaterial({
   vertexShader,
   fragmentShader,
   uniforms: {
