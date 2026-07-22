@@ -1,7 +1,5 @@
-#version 300 es
 precision highp float;
-in vec2 vUv;
-out vec4 fragColor;
+varying vec2 vUv;
 
 uniform vec3 uCameraPos;
 uniform vec3 uCameraDir;
@@ -145,11 +143,11 @@ vec3 GetClouds(in vec3 sky, in vec3 rd) {
   rd.xz += uCameraPos.xz;
   rd.xz *= .010;
   float f = (FractalNoise(rd.xz) -.55) * 5.0;
-  
+
   // Cloud color: warm from sun, cooler away
   float sunAmt = max(dot(rd, SUN_DIR), 0.0);
   vec3 cloudCol = mix(vec3(.55, .55, .52), vec3(1.0, 0.7, 0.4), sunAmt * 0.6);
-  
+
   sky = mix(sky, cloudCol, clamp(f*rd.y-.1, 0.0, 1.0));
   return sky;
 }
@@ -160,11 +158,11 @@ vec3 ApplyFog(in vec3 rgb, in float dis, in vec3 dir) {
   float heightFog = exp(-max(uCameraPos.y - 5.0, 0.0) * 0.02);
   float distFog = exp(-dis * 0.00004);
   float fogAmount = distFog * heightFog;
-  
+
   // Fog color: warm near sun, cool away
   float sunAmt = max(dot(dir, SUN_DIR), 0.0);
   vec3 fogCol = mix(vec3(0.4, 0.45, 0.6), vec3(1.0, 0.7, 0.4), sunAmt * 0.5);
-  
+
   return mix(fogCol, rgb, fogAmount);
 }
 
@@ -288,26 +286,26 @@ vec3 TerrainColour(vec3 pos, vec3 normal, float dis) {
     // Compute water normal with waves
     float time = uTime * 0.03;
     vec3 watPos = pos;
-      
+
     // Wave perturbation
     float wave1 = Noise(watPos.xz * 0.8 + time * 2.0);
     float wave2 = Noise(watPos.xz * 3.0 - time * 1.5);
     vec3 waterNor = normalize(vec3(wave1 * 0.08, 1.0, wave2 * 0.08));
-      
+
     mat = GetWaterColor(pos, dir, waterNor, dis);
-      
+
     // Shore foam
     float foam = smoothstep(1.0, 0.0, abs(distToWater));
     foam *= Noise(pos.xz * 15.0 + uTime * 0.3);
     mat = mix(mat, vec3(0.85, 0.92, 0.95), foam * 0.25);
-      
+
     DoLighting(mat, pos, waterNor, dir, disSqrd);
   } else {
     DoLighting(mat, pos, normal, dir, disSqrd);
   }
 
   mat = ApplyFog(mat, disSqrd, dir);
-  
+
   // Add volumetric fog glow
   float volFog = VolumetricFog(pos, dir, dis);
   if (volFog > 0.0) {
@@ -315,7 +313,7 @@ vec3 TerrainColour(vec3 pos, vec3 normal, float dis) {
     vec3 fogGlow = mix(vec3(0.5, 0.55, 0.7), vec3(1.0, 0.75, 0.5), sunAmt);
     mat = mix(mat, fogGlow, volFog);
   }
-  
+
   return mat;
 }
 
@@ -392,5 +390,5 @@ void main() {
   float vign = 1.0 - dot(uv, uv) * 0.15;
   col *= vign;
 
-  fragColor = vec4(col, 1.0);
+  gl_FragColor = vec4(col, 1.0);
 }

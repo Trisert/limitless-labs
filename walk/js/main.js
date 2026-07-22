@@ -10,19 +10,16 @@ async function loadShader(url) {
 }
 
 // Fallback: inline shaders if fetch fails (GitHub Pages MIME issues)
-const FALLBACK_VERT = `#version 300 es
-layout(location = 0) in vec3 position;
-layout(location = 1) in vec2 uv;
-out vec2 vUv;
+const FALLBACK_VERT = `attribute vec3 position;
+attribute vec2 uv;
+varying vec2 vUv;
 void main() {
   vUv = uv;
   gl_Position = vec4(position.xy, 0.0, 1.0);
 }`;
 
-const FALLBACK_FRAG = `#version 300 es
-precision highp float;
-in vec2 vUv;
-out vec4 fragColor;
+const FALLBACK_FRAG = `precision highp float;
+varying vec2 vUv;
 uniform vec3 uCameraPos;
 uniform vec3 uCameraDir;
 uniform float uTime;
@@ -311,7 +308,7 @@ void main() {
   vec2 uv = vUv * 2.0 - 1.0;
   float vign = 1.0 - dot(uv, uv) * 0.15;
   col *= vign;
-  fragColor = vec4(col, 1.0);
+  gl_FragColor = vec4(col, 1.0);
 }`;
 
 // ============ MAIN SETUP ============
