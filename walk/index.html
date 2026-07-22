@@ -389,7 +389,9 @@ const eagle = {
 // Replicate Hoskins' Terrain function in JS for height sampling
 const rotate2D = [1.3623, 1.7531, -1.7131, 1.4623];
 function hash12(p) {
-  const p3 = [fract(p.x * 0.1031), fract(p.y * 0.1031), fract((p.x + p.y) * 0.1031)];
+  const px = Array.isArray(p) ? p[0] : p.x;
+  const py = Array.isArray(p) ? p[1] : p.y;
+  const p3 = [fract(px * 0.1031), fract(py * 0.1031), fract((px + py) * 0.1031)];
   const dot = p3[0] * p3[1] + p3[1] * p3[2] + p3[2] * p3[0] + 19.19 * (p3[0] + p3[1] + p3[2]);
   return fract((p3[0] + p3[1]) * p3[2] * dot);
 }
