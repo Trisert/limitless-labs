@@ -67,10 +67,10 @@ uniform vec3 uCameraDir;
 uniform float uTime;
 uniform vec2 uResolution;
 
-vec3 sunLight = normalize(vec3(0.4, 0.4, 0.48));
-vec3 sunColour = vec3(1.0, .9, .83);
+vec3 sunLight = normalize(vec3(-0.15, 0.12, 0.7));
+vec3 sunColour = vec3(1.0, 0.55, 0.15);
 float specular = 0.0;
-float ambient;
+float ambient = 0.3;
 vec2 add = vec2(1.0, 0.0);
 #define HASHSCALE1 .1031
 #define HASHSCALE3 vec3(.1031, .1030, .0973)
@@ -373,6 +373,41 @@ const eagle = {
   waveAmp2: 20,
 };
 
+// Replicate Hoskins' Terrain function in JS for height sampling
+const rot2D = [1.3623, 1.7531, -1.7131, 1.4623];
+function hash12(px, py) {
+  let p3x = (px * 0.1031) % 1; if(p3x < 0) p3x += 1;
+  let p3y = (py * 0.1031) % 1; if(p3y < 0) p3y += 1;
+  const d = p3x * p3y + p3y * p3x + 19.19 * (p3x + p3y);
+  return d - Math.floor(d);
+}
+function noise2d(x, y) {
+  const ix = Math.floor(x), iy = Math.floor(y);
+  const fx = x - ix, fy = y - iy;
+  const ux = fx*fx*(3-2*fx), uy = fy*fy*(3-2*fy);
+  const h1 = hash12(ix, iy);
+  const h2 = hash12(ix+1, iy);
+  const h3 = hash12(ix, iy+1);
+  const h4 = hash12(ix+1, iy+1);
+  return h1 + (h2-h1)*ux + (h3-h1)*uy + (h1-h2-h3+h4)*ux*uy;
+}
+function terrainJS(x, z) {
+  let px = x * 0.05, pz = z * 0.05;
+  let w = (noise2d(px*0.25, pz*0.25) * 0.75 + 0.15);
+  w = 66.0 * w * w;
+  let f = 0.0;
+  for (let i = 0; i < 5; i++) {
+    f += w * noise2d(px, pz);
+    w = -w * 0.4;
+    const nx = rot2D[0]*px + rot2D[1]*pz;
+    const nz = rot2D[2]*px + rot2D[3]*pz;
+    px = nx; pz = nz;
+  }
+  const ff = noise2d(px*0.002, pz*0.002);
+  f += Math.pow(Math.abs(ff), 5.0) * 275 - 5.0;
+  return f;
+}
+
 let lastTime = performance.now();
 let totalTime = 0;
 
@@ -395,15 +430,21 @@ function tick() {
     const camX = pathX + varX;
     const camZ = pathZ + varZ;
     
+    // Sample terrain height for camera
+    const groundH = terrainJS(camX, camZ);
+    const camY = Math.max(groundH + 10, 5);
+    
     // Look ahead
     const lookAheadT = t + 0.5;
     const lookX = Math.sin(lookAheadT * 0.3) * eagle.waveAmp + Math.cos(lookAheadT * 0.1) * 30 + Math.sin(lookAheadT * 0.55) * eagle.waveAmp2;
     const lookZ = lookAheadT * 80 + Math.sin(lookAheadT * 0.2) * eagle.waveAmp + Math.cos(lookAheadT * 0.45) * eagle.waveAmp2;
+    const lookH = terrainJS(lookX, lookZ);
+    const lookY = Math.max(lookH + 10, 5);
     
-    // Forward direction for shader
-    const forward = new THREE.Vector3(lookX - camX, 0 - 40, lookZ - camZ).normalize();
+    // Forward direction for shader (with terrain-following pitch)
+    const forward = new THREE.Vector3(lookX - camX, lookY - camY, lookZ - camZ).normalize();
     
-    material.uniforms.uCameraPos.value.set(camX, 40, camZ);
+    material.uniforms.uCameraPos.value.set(camX, camY, camZ);
     material.uniforms.uCameraDir.value.copy(forward);
     material.uniforms.uTime.value = time;
     
