@@ -369,7 +369,7 @@ const clock = new THREE.Clock();
 // Eagle flight path parameters
 const eagle = {
   t: 0,
-  speed: 0.015,
+  speed: 0.05,  // Increased for visible movement
   waveAmp: 45,
   waveAmp2: 20,
 };
@@ -399,6 +399,11 @@ function tick() {
     material.uniforms.uCameraPos.value.set(camX, 40, camZ);
     material.uniforms.uCameraDir.value.copy(forward);
     material.uniforms.uTime.value = time;
+    
+    // Log position every ~2 sec for debug
+    if (Math.floor(time / 2) !== Math.floor((time - 0.017) / 2)) {
+      console.log('pos:', camX.toFixed(0), camZ.toFixed(0), 'fwd:', forward.x.toFixed(2), forward.z.toFixed(2));
+    }
     
     renderer.render(scene, camera);
     requestAnimationFrame(tick);
