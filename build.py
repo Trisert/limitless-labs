@@ -216,10 +216,14 @@ def log_rows(posts):
         label = CAT_LABEL.get(p["category"], p["category"].upper())
         preview = first_paragraph_text(p["html"])
         rows.append(f"""    <a class="log-row" href="writing/{p['slug']}.html">
-      <div class="log-date">{p['date']}</div>
-      <div class="log-title">{p['title']}</div>
-      <div class="log-preview">{preview}</div>
-      <div class="log-cat {cls}">{label}</div>
+      <div class="log-meta">
+        <div class="log-date">{p['date']}</div>
+        <div class="log-cat {cls}">{label}</div>
+      </div>
+      <div class="log-body">
+        <div class="log-title">{p['title']}</div>
+        <div class="log-preview">{preview}</div>
+      </div>
     </a>""")
     return "\n".join(rows)
 
