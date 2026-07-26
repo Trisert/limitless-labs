@@ -89,12 +89,18 @@ def read_post(path: Path):
 
 def first_paragraph_text(md: str) -> str:
     """Best-effort plain-text excerpt for meta description / SEO."""
+    # Strips frontmatter, then extracts raw text by removing all HTML tags
+    # before stripping markdown syntax — important when input is already HTML
+    # (pandoc output or markdown.Markdown conversion). Stripping markdown
+    # markers first would mangle tags like <h1>, leaving broken fragments.
     text = re.sub(r"^---\s*\n.*?\n---\s*\n", "", md, flags=re.DOTALL)
+    # Remove HTML tags first so we get clean text regardless of input format
+    text = re.sub(r"<[^>]+>", " ", text)
     for para in re.split(r"\n\s*\n", text):
         clean = re.sub(r"[#>*_`\-]+", "", para).strip()
-        clean = re.sub(r"<[^>]+>", "", clean)
+        clean = re.sub(r"\s+", " ", clean)
         if len(clean) > 20:
-            return (clean[:155].rstrip() + "…") if len(clean) > 155 else clean
+            return (clean[:155].rstrip() + "\u2026") if len(clean) > 155 else clean
     return ""
 
 
