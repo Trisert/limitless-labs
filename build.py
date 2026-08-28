@@ -182,12 +182,15 @@ def article_page(post):
 <meta property="og:description" content="{desc}">
 <meta property="og:url" content="{url}">
 <meta property="og:locale" content="en_US">
+<meta property="og:image" content="{SITE_URL}/og-image.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="{post['title']}">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="{post['title']}">
 <meta name="twitter:description" content="{desc}">
+<meta name="twitter:image" content="{SITE_URL}/og-image.jpg">
 {json_ld}
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../style.css?v=3"/>
 <link rel="manifest" href="/limitless-labs/manifest.json"/>
 <meta name="theme-color" content="#FFB000"/>
@@ -215,9 +218,10 @@ def log_rows(posts):
         cls = CAT_CLASS.get(p["category"], "log-cat-sys")
         label = CAT_LABEL.get(p["category"], p["category"].upper())
         preview = first_paragraph_text(p["html"])
+        mins = reading_time_minutes(p["html"])
         rows.append(f"""    <a class="log-row" href="writing/{p['slug']}.html">
       <div class="log-meta">
-        <div class="log-date">{p['date']}</div>
+        <div class="log-date">{p['date']} · {mins} min</div>
         <div class="log-cat {cls}">{label}</div>
       </div>
       <div class="log-body">
@@ -232,11 +236,14 @@ def inject_log(index_html: str, log_block: str, count: int):
     pattern = re.compile(r"<!-- LOG_START -->.*?<!-- LOG_END -->", re.DOTALL)
     block = f"<!-- LOG_START -->\n{log_block}\n    <!-- LOG_END -->"
     new = pattern.sub(block, index_html)
-    if count:
-        new = new.replace(
-            '<div class="section-note" id="log-count"></div>',
-            f'<div class="section-note" id="log-count">{count} ENTRIES</div>',
-        )
+    # P0.1: replace log-count even when it already has content (e.g. "3 ENTRIES")
+    count_text = f"{count} ENTRIES" if count else "0"
+    new = re.sub(
+        r'<div.*id="log-count".*?>.*?</div>',
+        f'<div class="section-note" id="log-count">{count_text}</div>',
+        new,
+        flags=re.DOTALL,
+    )
     return new
 
 
