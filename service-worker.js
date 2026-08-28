@@ -1,5 +1,5 @@
 /* Limitless Labs — PWA service worker, cache-first for static assets */
-const CACHE_NAME = 'limitless-labs-static-v1';
+const CACHE_NAME = 'limitless-labs-static-v2';
 const PRECACHE_URLS = [
   '/limitless-labs/',
   '/limitless-labs/index.html',
@@ -10,6 +10,8 @@ const PRECACHE_URLS = [
   '/limitless-labs/fonts/space-grotesk.woff2',
   '/limitless-labs/fonts/ibm-plex-sans.woff2',
   '/limitless-labs/fonts/jetbrains-mono.woff2',
+  '/limitless-labs/textures/earth-blue-marble.webp',
+  '/limitless-labs/og-image.jpg',
   '/limitless-labs/privacy.html',
   '/limitless-labs/robots.txt',
   '/limitless-labs/sitemap.xml',
