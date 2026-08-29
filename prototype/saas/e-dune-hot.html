@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DUNE Hot — Procedural Dunes</title>
+<meta name="robots" content="noindex, nofollow">
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400&family=Pixelify+Sans:wght@400&family=Inter:wght@300;400&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:#0A0F14;color:#fff;overflow:hidden}
+nav{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:10;width:calc(100% - 32px);max-width:1160px;display:flex;justify-content:space-between;align-items:center}
+.logo{font-family:'Geist Mono',monospace;font-size:12px;letter-spacing:.08em;background:rgba(10,15,20,.5);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.08);padding:10px 14px;display:flex;gap:8px;align-items:center}
+.logo i{width:14px;height:14px;background:#FF6B2C;clip-path:polygon(50% 0,100% 70%,50% 100%,0 70%)}
+.links{display:flex;gap:2px;background:rgba(10,15,20,.5);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.08);padding:4px}
+.links a{font-family:'Geist Mono',monospace;font-size:11px;padding:8px 14px;color:rgba(255,255,255,.5)}
+.links a.on{background:rgba(255,255,255,.08);color:#fff}
+canvas{position:fixed;inset:0;width:100%;height:100%;z-index:0}
+.hero{position:relative;z-index:1;min-height:100vh;display:flex;align-items:flex-end;padding:0 24px 80px;max-width:1160px;margin:0 auto;width:100%}
+.pixel{font-family:'Pixelify Sans',monospace;font-size:clamp(32px,5vw,54px);line-height:.95;text-transform:uppercase}
+.sub{font-size:15px;font-weight:300;color:rgba(255,255,255,.65);max-width:520px;margin-top:16px;line-height:1.6}
+.btn{font-family:'Geist Mono',monospace;font-size:11px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;padding:10px 18px;margin-top:20px;display:inline-block}
+.bar{position:fixed;bottom:0;left:0;right:0;z-index:2;display:grid;grid-template-columns:repeat(7,1fr);border-top:1px solid rgba(255,255,255,.08);background:rgba(10,15,20,.4);backdrop-filter:blur(8px)}
+.bar span{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);text-align:center;padding:14px 6px;border-right:1px solid rgba(255,255,255,.06)}
+</style>
+</head>
+<body>
+<nav><div class="logo"><i></i> LIMITLESS LABS</div><div class="links"><a class="on">Hot Dunes</a><a href="e-dune-cold.html">Cold →</a><a href="e-dune.html">Static</a></div></nav>
+<canvas id="c"></canvas>
+<div class="hero">
+<div>
+<div class="pixel">I STUDY THE<br>SKY. I BUILD<br>THE TOOLS.</div>
+<div class="sub">Procedural desert — fBm dunes + sunset gradient. No image, just math. Hover to shift wind.</div>
+<a class="btn" href="#log">Read the log →</a>
+</div>
+</div>
+<div class="bar"><span>◈ ESA</span><span>RUST</span><span>LINUX</span><span>GITHUB</span><span>27 SATS</span><span>PWA</span><span>DEBIAN</span></div>
+<script>
+// Hot desert shader - 2D canvas fBm dunes
+const c=document.getElementById('c'),x=c.getContext('2d')
+let w,h,t=0,mx=0
+function resize(){w=c.width=innerWidth;h=c.height=innerHeight}
+addEventListener('resize',resize);resize()
+addEventListener('mousemove',e=>mx=(e.clientX/w-.5)*0.5)
+function n(x,y){return Math.sin(x*1.2)*Math.cos(y*.8)*.5+Math.sin(x*.5+y)*.3+Math.sin(x*2.3-y*1.7)*.15}
+function fbm(x,y){let v=0,a=.5,f=1;for(let i=0;i<4;i++){v+=a*n(x*f,y*f);a*=.5;f*=2}return v}
+function draw(){
+ t+=0.008
+ x.clearRect(0,0,w,h)
+ // sky gradient
+ let g=x.createLinearGradient(0,0,0,h)
+ g.addColorStop(0,'#0B1A1F');g.addColorStop(0.35,'#1A2A2E');g.addColorStop(0.55,'#2A3A3A');g.addColorStop(0.7,'#8B4A2A');g.addColorStop(0.85,'#C46A2A');g.addColorStop(1,'#E8A44A')
+ x.fillStyle=g;x.fillRect(0,0,w,h)
+ // sun
+ x.fillStyle='rgba(255,220,150,.9)';x.beginPath();x.arc(w*.72,h*.32, 38+Math.sin(t*0.7)*2,0,Math.PI*2);x.fill()
+ x.fillStyle='rgba(255,180,80,.12)';x.beginPath();x.arc(w*.72,h*.32, 120,0,Math.PI*2);x.fill()
+ // dunes layers back to front
+ const layers=[
+  {y:0.62, amp:80, col:'#4A2A14', alpha:.9, off:0},
+  {y:0.68, amp:55, col:'#6B3A1A', alpha:.95, off:1.5},
+  {y:0.74, amp:42, col:'#8B5120', alpha:1, off:3},
+  {y:0.82, amp:28, col:'#A86A2A', alpha:1, off:5},
+ ]
+ layers.forEach((L,i)=>{
+  x.beginPath();x.moveTo(0,h)
+  for(let px=0;px<=w;px+=4){
+   let nx=px/w*3 + t*0.15 + L.off + mx* (i+1)*0.3
+   let ny=fbm(nx, i*1.7)*L.amp + Math.sin(px/w*Math.PI*2 + t*0.5 + i)*8
+   let py=h*L.y + ny - Math.pow(Math.abs(px-w/2)/(w/2),1.5)*30
+   if(px===0) x.lineTo(px,py); else x.lineTo(px,py)
+  }
+  x.lineTo(w,h);x.closePath()
+  x.fillStyle=L.col;x.globalAlpha=L.alpha;x.fill();x.globalAlpha=1
+  // highlight ridge
+  x.strokeStyle='rgba(255,200,120,.15)';x.lineWidth=1;x.stroke()
+ })
+ // grain
+ x.fillStyle='rgba(0,0,0,.04)'
+ for(let i=0;i<180;i++){x.fillRect(Math.random()*w,Math.random()*h,1,1)}
+ requestAnimationFrame(draw)
+}
+draw()
+</script>
+</body>
+</html>
