@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cold Realistic Lunar</title>
+<meta name="robots" content="noindex, nofollow">
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400&family=Pixelify+Sans:wght@400&family=Inter:wght@300&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#020610;color:#E8EEF5;overflow:hidden;font-family:'Inter',sans-serif}
+nav{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:10;width:calc(100% - 32px);max-width:1160px;display:flex;justify-content:space-between;align-items:center}
+.logo{font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:.08em;background:rgba(5,10,20,.5);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.06);padding:10px 14px}
+.links{display:flex;gap:2px;background:rgba(5,10,20,.5);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.06);padding:4px}
+.links a{font-family:'Geist Mono',monospace;font-size:11px;padding:8px 14px;color:rgba(255,255,255,.45)}
+.links a.on{background:rgba(255,255,255,.06);color:#fff}
+canvas{position:fixed;inset:0;width:100%;height:100%}
+.hero{position:relative;z-index:1;min-height:100vh;display:flex;align-items:flex-end;padding:0 24px 80px;max-width:1160px;margin:0 auto}
+.pixel{font-family:'Pixelify Sans',monospace;font-size:clamp(32px,5vw,54px);line-height:.95;text-transform:uppercase}
+.sub{font-weight:300;color:rgba(232,238,245,.55);margin-top:14px;max-width:520px;font-size:14px}
+</style>
+</head>
+<body>
+<nav><div class="logo">LIMITLESS — COLD REALISTIC</div><div class="links"><a href="e-dune-hot-real.html">Hot Real →</a><a class="on">Cold Real</a><a href="e-dune-cold.html">Flat Cold</a></div></nav>
+<canvas id="c"></canvas>
+<div class="hero"><div><div class="pixel">I STUDY THE<br>SKY. I BUILD<br>THE TOOLS.</div><div class="sub">Realistic lunar — cratered regolith + earthshine + starfield.</div></div></div>
+<script>
+const canvas=document.getElementById('c'),gl=canvas.getContext('webgl')
+const vs=`attribute vec2 p;void main(){gl_Position=vec4(p,0,1);}`
+const fs=`
+precision highp float;
+uniform vec2 r; uniform float t;
+float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float noise(vec2 p){vec2 i=floor(p),f=fract(p);float a=hash(i),b=hash(i+vec2(1,0)),c=hash(i+vec2(0,1)),d=hash(i+vec2(1,1));vec2 u=f*f*(3.-2.*f);return mix(mix(a,b,u.x),mix(c,d,u.x),u.y);}
+float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<5;i++){v+=a*noise(p);p*=2.;a*=.5;}return v;}
+float domainWarp(vec2 p){vec2 q=vec2(fbm(p),fbm(p+vec2(5.2,1.3)));vec2 r=vec2(fbm(p+4.*q+vec2(1.7,9.2)),fbm(p+4.*q+vec2(8.3,2.8)));return fbm(p+4.*r);}
+void main(){
+ vec2 uv=gl_FragCoord.xy/r;
+ vec2 p=uv*2.-1.;p.x*=r.x/r.y;
+ // starfield
+ float stars=0.;
+ for(int i=0;i<3;i++){
+  vec2 sp=uv*vec2(80.,45.)+vec2(float(i)*17.);
+  float h=hash(floor(sp));
+  if(h>0.985) stars+=pow(h,8.)* (0.7+0.3*sin(t*0.5+float(i)*3.));
+ }
+ // sky cold
+ vec3 sky=mix(vec3(0.01,0.02,0.05),vec3(0.03,0.07,0.14), pow(uv.y,0.6));
+ sky+=vec3(0.15,0.22,0.35)*smoothstep(0.5,0.68,uv.y)*0.35;
+ sky+=vec3(1.,1.,1.)*stars*0.9;
+ // earth glow faint upper right
+ float earth=smoothstep(0.08,0.0,length(uv-vec2(0.78,0.72)));
+ sky+=vec3(0.3,0.5,0.8)*earth*0.18;
+ // lunar terrain height realistic
+ float time=t*0.025;
+ vec2 coord=vec2(uv.x*3.4+time*0.1, uv.y*1.4);
+ float h=domainWarp(coord*2.2)*0.6 + domainWarp(coord*7.)*0.16;
+ // craters
+ vec2 cp=uv*18.;
+ float c1=hash(floor(cp));
+ if(c1>0.92){
+  vec2 cf=fract(cp)-0.5;
+  float d=length(cf);
+  float crater=smoothstep(0.32,0.28,d)-smoothstep(0.18,0.15,d)*0.7;
+  h-=crater*0.45;
+ }
+ float horizon=0.62;
+ float mask=smoothstep(horizon, horizon+0.015, uv.y + h*0.22);
+ // regolith colors realistic cold
+ vec3 regLow=vec3(0.18,0.2,0.24);
+ vec3 regMid=vec3(0.28,0.3,0.34);
+ vec3 regHigh=vec3(0.42,0.44,0.48);
+ float hf=smoothstep(0.25,0.65,h);
+ vec3 reg=mix(regLow, regMid, hf);
+ reg=mix(reg, regHigh, smoothstep(0.55,0.85,h)*0.5);
+ // lighting cold sun low left
+ vec2 eps=vec2(0.007,0);
+ float hL=domainWarp((coord+eps)*2.2)*0.6, hR=domainWarp((coord-eps)*2.2)*0.6;
+ float slope=(hR-hL)/0.014;
+ float light=max(0., dot(normalize(vec3(-slope,1.,0.)), normalize(vec3(-0.7,0.9,0.2))));
+ light=0.35+0.65*light;
+ // crater shadow
+ float craterShade=1.-smoothstep(0.2,0.5, -slope)*0.35;
+ light*=craterShade;
+ // micro roughness
+ float micro=fbm(vec2(uv.x*90., uv.y*3.))*0.018;
+ light+=micro;
+ reg*=light;
+ // earthshine fill
+ reg+=vec3(0.06,0.08,0.12)* (1.-light)*0.25;
+ vec3 col=mix(sky, reg, mask);
+ // cold fog near horizon
+ float fog=smoothstep(0.55,0.72,uv.y)*0.12*(1.-mask*0.3);
+ col=mix(col, vec3(0.12,0.16,0.22), fog);
+ float vig=1.-dot(uv-0.5,uv-0.5)*0.2;
+ col*=vig;
+ float grain=hash(gl_FragCoord.xy*0.6+t*0.1)*0.03-0.015;
+ col+=grain;
+ gl_FragColor=vec4(col,1.);
+}
+`
+function sh(t,s){let o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);if(!gl.getShaderParameter(o,gl.COMPILE_STATUS))console.log(gl.getShaderInfoLog(o));return o}
+let v=sh(gl.VERTEX_SHADER,vs),f=sh(gl.FRAGMENT_SHADER,fs),pr=gl.createProgram()
+gl.attachShader(pr,v);gl.attachShader(pr,f);gl.linkProgram(pr);gl.useProgram(pr)
+let b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW)
+let l=gl.getAttribLocation(pr,'p');gl.enableVertexAttribArray(l);gl.vertexAttribPointer(l,2,gl.FLOAT,0,0,0)
+let rL=gl.getUniformLocation(pr,'r'),tL=gl.getUniformLocation(pr,'t')
+function rs(){canvas.width=innerWidth*devicePixelRatio;canvas.height=innerHeight*devicePixelRatio;canvas.style.width=innerWidth+'px';canvas.style.height=innerHeight+'px';gl.viewport(0,0,canvas.width,canvas.height)}
+addEventListener('resize',rs);rs()
+let s=performance.now()
+function loop(){let n=(performance.now()-s)/1000;gl.uniform2f(rL,canvas.width,canvas.height);gl.uniform1f(tL,n);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);requestAnimationFrame(loop)}loop()
+</script>
+</body>
+</html>
