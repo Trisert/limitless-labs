@@ -43,13 +43,13 @@ void main(){
  sky+=vec3(0.15,0.22,0.35)*smoothstep(0.5,0.68,uv.y)*0.3;
  float stars=0.;for(int i=0;i<2;i++){vec2 sp=uv*vec2(70.,40.)+vec2(float(i)*17.);float h=hash(floor(sp));if(h>0.986)stars+=pow(h,8.)*(0.7+0.3*sin(t*0.8+float(i)*3.));}
  sky+=vec3(1.)*stars*0.7;
- float time=t*0.02;vec2 coord=vec2(uv.x*3.0+time*0.08, uv.y);
+ float time=t*0.07;vec2 coord=vec2(uv.x*3.0+time*0.08, uv.y);
  vec2 qc=vec2(fbm(coord),fbm(coord+vec2(4.5,2.1)));
  float h=fbm(coord*2.0+1.5*qc)*0.5 + fbm(coord*6.)*0.12;
  float mask=smoothstep(0.60,0.62, uv.y + h*0.20);
  vec3 reg=mix(vec3(0.18,0.2,0.24), vec3(0.32,0.34,0.38), smoothstep(0.25,0.6,h));
  float slope=fbm((coord+vec2(0.008,0))*2.)-fbm((coord-vec2(0.008,0))*2.);
- float light=0.45+0.55*max(0.,dot(normalize(vec3(-slope*3.,1.,0.)), normalize(vec3(-0.6,0.9,0.2))));
+ float light=0.35+0.65*max(0.,dot(normalize(vec3(-slope*5.,1.,0.)), normalize(vec3(-0.6,0.9,0.2))));
  reg*=light;reg+=vec3(0.05,0.07,0.10)*(1.-light)*0.2;
  vec3 col=mix(sky, reg, mask);col*=1.-dot(uv-0.5,uv-0.5)*0.15;
  gl_FragColor=vec4(col,1.);
