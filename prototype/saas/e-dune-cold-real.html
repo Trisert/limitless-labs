@@ -9,6 +9,8 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#020610;color:#E8EEF5;overflow:hidden;font-family:'Inter',sans-serif}
+body.no-webgl{background:url('e-dune-cold-poster.jpg') center/cover no-repeat}
+body.no-webgl canvas{display:none}
 nav{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:10;width:calc(100% - 32px);max-width:1160px;display:flex;justify-content:space-between;align-items:center}
 .logo{font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:.08em;background:rgba(5,10,20,.5);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.06);padding:10px 14px}
 .links{display:flex;gap:2px;background:rgba(5,10,20,.5);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.06);padding:4px}
@@ -27,7 +29,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%}
 <script>
 const canvas=document.getElementById('c')
 let gl=canvas.getContext('webgl')||canvas.getContext('experimental-webgl')
-if(!gl){document.body.style.background='#020610'}
+if(!gl){document.body.classList.add('no-webgl')}
 else{
 const vs=`attribute vec2 p;void main(){gl_Position=vec4(p,0,1);}`
 const fs=`precision mediump float;
@@ -39,10 +41,11 @@ void main(){
  vec2 uv=gl_FragCoord.xy/r;
  vec3 sky=mix(vec3(0.01,0.02,0.05),vec3(0.03,0.07,0.14), pow(uv.y,0.6));
  sky+=vec3(0.15,0.22,0.35)*smoothstep(0.5,0.68,uv.y)*0.3;
- float stars=0.;for(int i=0;i<2;i++){vec2 sp=uv*vec2(70.,40.)+vec2(float(i)*17.);float h=hash(floor(sp));if(h>0.986)stars+=pow(h,8.)*0.8;}
+ float stars=0.;for(int i=0;i<2;i++){vec2 sp=uv*vec2(70.,40.)+vec2(float(i)*17.);float h=hash(floor(sp));if(h>0.986)stars+=pow(h,8.)*(0.7+0.3*sin(t*0.8+float(i)*3.));}
  sky+=vec3(1.)*stars*0.7;
  float time=t*0.02;vec2 coord=vec2(uv.x*3.0+time*0.08, uv.y);
- float h=fbm(coord*2.0)*0.5 + fbm(coord*6.)*0.12;
+ vec2 qc=vec2(fbm(coord),fbm(coord+vec2(4.5,2.1)));
+ float h=fbm(coord*2.0+1.5*qc)*0.5 + fbm(coord*6.)*0.12;
  float mask=smoothstep(0.60,0.62, uv.y + h*0.20);
  vec3 reg=mix(vec3(0.18,0.2,0.24), vec3(0.32,0.34,0.38), smoothstep(0.25,0.6,h));
  float slope=fbm((coord+vec2(0.008,0))*2.)-fbm((coord-vec2(0.008,0))*2.);
@@ -58,7 +61,7 @@ if(!gl.getProgramParameter(pr,gl.LINK_STATUS))console.error(gl.getProgramInfoLog
 let b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW)
 let l=gl.getAttribLocation(pr,'p');gl.enableVertexAttribArray(l);gl.vertexAttribPointer(l,2,gl.FLOAT,0,0,0)
 let rL=gl.getUniformLocation(pr,'r'),tL=gl.getUniformLocation(pr,'t')
-function rs(){canvas.width=innerWidth*devicePixelRatio;canvas.height=innerHeight*devicePixelRatio;canvas.style.width=innerWidth+'px';canvas.style.height=innerHeight+'px';gl.viewport(0,0,canvas.width,canvas.height)}
+function rs(){let d=Math.min(devicePixelRatio,2);canvas.width=innerWidth*d;canvas.height=innerHeight*d;canvas.style.width=innerWidth+'px';canvas.style.height=innerHeight+'px';gl.viewport(0,0,canvas.width,canvas.height)}
 addEventListener('resize',rs);rs()
 let s=performance.now()
 function loop(){let n=(performance.now()-s)/1000;gl.uniform2f(rL,canvas.width,canvas.height);gl.uniform1f(tL,n);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);requestAnimationFrame(loop)}loop()
