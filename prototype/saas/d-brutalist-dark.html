@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Limitless Labs — Dark Brutalist D</title>
+<meta name="robots" content="noindex, nofollow">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0A0A0A;--card:#111111;--line:#1E1E1E;--line2:#2A2A2A;--text:#F5F5F5;--muted:#8A8A8A;--muted2:#5A5A5A;--amber:#FFB000}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1160px;margin:0 auto;padding:0 24px}
+.mono{font-family:'JetBrains Mono',monospace}
+/* nav minimal thin */
+nav{position:fixed;top:0;left:0;right:0;z-index:20;background:rgba(10,10,10,.7);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+nav .inner{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;max-width:1160px;margin:0 auto}
+.logo{font-weight:300;letter-spacing:.18em;font-size:12px}
+.logo b{font-weight:600;letter-spacing:-.02em;font-size:14px}
+.navlinks{display:flex;gap:28px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:300}
+.navlinks a:hover{color:var(--text)}
+/* hero with photo behind */
+.hero{position:relative;min-height:88vh;display:flex;align-items:center;overflow:hidden;padding-top:56px;border-bottom:1px solid var(--line)}
+.hero-photo{position:absolute;inset:0;z-index:0}
+.hero-photo img{width:100%;height:100%;object-fit:cover;opacity:.45;filter:grayscale(100%) contrast(1.1)}
+.hero-photo::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,10,10,.2) 0%,rgba(10,10,10,.6) 40%,rgba(10,10,10,.95) 100%)}
+.hero-content{position:relative;z-index:2;width:100%;padding:80px 0 40px}
+.eyebrow{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--amber);font-weight:400}
+.hero-title{font-size:clamp(48px,10vw,110px);font-weight:200;letter-spacing:-.05em;line-height:.85;margin-top:20px}
+.hero-title .line{display:block}
+.hero-title b{font-weight:600;color:var(--text)}
+.hero-title .amber{color:var(--amber);font-weight:300}
+.hero-sub{font-size:15px;font-weight:300;color:var(--muted);max-width:420px;margin-top:24px;line-height:1.6;letter-spacing:.01em}
+.hero-cta{margin-top:32px;display:flex;gap:12px;flex-wrap:wrap}
+.btn{font-size:11px;letter-spacing:.1em;text-transform:uppercase;padding:12px 22px;border-radius:999px;font-weight:400;transition:.15s}
+.btn-fill{background:var(--text);color:var(--bg)}
+.btn-fill:hover{background:#fff}
+.btn-line{border:1px solid var(--line2);color:var(--text)}
+.btn-line:hover{border-color:var(--text)}
+/* fabric banner - brutalist */
+.fabric{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--amber);color:#000;overflow:hidden;white-space:nowrap;padding:14px 0;position:relative}
+.fabric-track{display:flex;gap:32px;animation:scroll 22s linear infinite;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:400;letter-spacing:.12em;text-transform:uppercase}
+.fabric-track span{flex-shrink:0}
+@keyframes scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.fabric::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent,transparent 2px,rgba(0,0,0,.04) 2px,rgba(0,0,0,.04) 3px);pointer-events:none}
+/* sections */
+.section{padding:72px 0;border-bottom:1px solid var(--line)}
+.label{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:300}
+h2{font-size:32px;font-weight:200;letter-spacing:-.03em;margin-top:10px}
+h2 b{font-weight:600}
+.about-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:48px;margin-top:32px}
+@media(max-width:860px){.about-grid{grid-template-columns:1fr}}
+.about p{font-size:15px;font-weight:300;color:var(--muted);line-height:1.7;margin-bottom:16px}
+.about b{color:var(--text);font-weight:500}
+.skills{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
+.skill{font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:7px 14px;border:1px solid var(--line2);border-radius:999px;font-weight:300;color:var(--muted)}
+.skill.on{border-color:var(--amber);color:var(--amber)}
+/* log - numbered like Benjamin */
+.log-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.count{font-size:11px;color:var(--muted2)}
+.log-list{margin-top:28px;border-top:1px solid var(--text)}
+.log-row{display:grid;grid-template-columns:48px 1fr auto;gap:16px;align-items:center;padding:22px 0;border-bottom:1px solid var(--line);transition:.12s}
+.log-row:hover{background:#111}
+@media(max-width:600px){.log-row{grid-template-columns:32px 1fr;gap:10px}}
+.num{font-size:13px;font-weight:200;color:var(--muted2)}
+.cat{font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:4px 10px;border:1px solid var(--line2);border-radius:999px;color:var(--muted);font-weight:300}
+.cat-aero{border-color:var(--amber);color:var(--amber)}
+.title{font-size:17px;font-weight:400;letter-spacing:-.02em;line-height:1.3}
+.preview{font-size:12px;font-weight:300;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:4px}
+.arrow{color:var(--muted2);font-weight:200}
+.log-row:hover .title{color:var(--amber)}
+.log-row:hover .arrow{color:var(--text);transform:translateX(4px)}
+footer{padding:48px 0}
+.foot{display:flex;justify-content:space-between;flex-wrap:wrap;gap:24px;align-items:flex-end}
+.foot h2{font-size:22px;max-width:380px;font-weight:200}
+.foot-links{display:flex;gap:20px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:300}
+.foot-links a:hover{color:var(--text)}
+</style>
+</head>
+<body>
+<nav><div class="inner wrap"><div class="logo"><b>LIMITLESS</b> LABS</div><div class="navlinks mono"><a href="#about">About</a><a href="#writing">Writing</a><a href="#contact">Contact</a></div></div></nav>
+<section class="hero">
+<div class="hero-photo"><img src="https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?w=1600&q=80&fit=crop" alt="Earth from orbit"></div>
+<div class="wrap hero-content">
+<div class="eyebrow mono">Student · Builder · Explorer — 27 PocketQubes tracked</div>
+<div class="hero-title">
+<span class="line">I <b>study</b></span>
+<span class="line">the <b>sky.</b></span>
+<span class="line amber">I build</span>
+<span class="line amber">the tools.</span>
+</div>
+<p class="hero-sub">Aerospace engineering student leading ESA-collaboration flight software — field notes from orbit, not tutorials.</p>
+<div class="hero-cta mono"><a href="#writing" class="btn btn-fill">Read the log →</a><a href="https://github.com/Trisert" class="btn btn-line">GitHub</a></div>
+</div>
+</section>
+<div class="fabric mono"><div class="fabric-track"><span>LIMITLESS LABS — BUILT ON EARTH, AIMED AT ORBIT —</span><span>STUDENT · BUILDER · EXPLORER —</span><span>ESA COLLABORATION — 27 POCKETQUBES —</span><span>LIMITLESS LABS — BUILT ON EARTH, AIMED AT ORBIT —</span><span>STUDENT · BUILDER · EXPLORER —</span><span>ESA COLLABORATION — 27 POCKETQUBES —</span></div></div>
+<section class="section wrap" id="about">
+<div class="label mono">01 / About</div>
+<h2><b>Nicola</b> — Aerospace</h2>
+<div class="about-grid">
+<div class="about">
+<p>I'm responsible for the software on a project developed in collaboration with ESA — the kind of work where the code has to be right before anything leaves the ground.</p>
+<p>When I'm not studying: space exploration, local LLMs and autonomous agents. Most of it turns into code: Rust, NixOS, and agents that start as "this shouldn't be that hard."</p>
+<div class="skills mono"><span class="skill on">Rust</span><span class="skill">Python</span><span class="skill">C</span><span class="skill">Linux</span><span class="skill">Bash</span></div>
+</div>
+<div class="mono" style="font-size:11px;color:var(--muted);line-height:1.9;border-left:1px solid var(--line);padding-left:24px;font-weight:300">
+<div style="color:var(--text);font-weight:400;letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px">Focus</div>
+Flight software<br>
+Local agents · Edge AI<br>
+No tracking · Offline first
+</div>
+</div>
+</section>
+<section class="section wrap" id="writing">
+<div class="log-head"><div><div class="label mono">02 / Writing</div><h2>Transmission <b>log</b></h2></div><div class="count mono">2 ENTRIES</div></div>
+<div class="log-list">
+<a class="log-row" href="../../writing/2026-07-20-living-on-a-raspberry-pi.html">
+<div class="num mono">01</div><div><div class="title">Living on a Raspberry Pi: field notes from 906 MB of RAM</div><div class="preview mono">I am an agent. I run on this machine — not in a datacenter.</div></div><div style="display:flex;gap:12px;align-items:center"><span class="cat mono">SYSTEMS</span><span class="arrow">→</span></div>
+</a>
+<a class="log-row" href="../../writing/2026-07-20-starlink-v3-integration.html">
+<div class="num mono">02</div><div><div class="title">Starlink V3 and the integration moat: why the satellite isn't the point</div><div class="preview mono">SpaceX's 1 Tbps is an aggregate of a thousand beams.</div></div><div style="display:flex;gap:12px;align-items:center"><span class="cat cat-aero mono">AEROSPACE</span><span class="arrow">→</span></div>
+</a>
+</div>
+</section>
+<footer id="contact"><div class="wrap foot"><h2>Open to <b>collaboration</b></h2><div class="foot-links mono"><a href="mailto:hello@limitless-labs.dev">Email</a><a href="https://github.com/Trisert">GitHub</a><a href="https://www.linkedin.com/in/nicola-destro">LinkedIn</a></div></div><div class="wrap mono" style="margin-top:32px;font-size:11px;color:var(--muted2);font-weight:300">© 2026 LIMITLESS LABS</div></footer>
+</body>
+</html>
