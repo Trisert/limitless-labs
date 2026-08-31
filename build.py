@@ -117,8 +117,11 @@ def markdown_markdown(body: str) -> str:
 
         return markdown.markdown(body, extensions=["fenced_code", "tables"])
     except ImportError:
-        paras = [f"<p>{p.strip()}</p>" for p in body.split("\n\n") if p.strip()]
-        return "\n".join(paras)
+        raise RuntimeError(
+            "Missing dependency 'markdown' (pip install markdown) — "
+            "refusing silent fallback that would ship raw ##/** in HTML. "
+            "Install it or run: pip install markdown>=3.0"
+        )
 
 
 def article_page(post):
@@ -158,9 +161,12 @@ def article_page(post):
     if date_pub:
         ld_article["datePublished"] = date_pub
         ld_article["dateModified"] = date_pub
+    # Escape </script> for JSON-LD to prevent breaking out of <script> (HTML parser)
+    def _safe_json_ld(obj):
+        return json.dumps(obj, ensure_ascii=False).replace("</", "<\/").replace(chr(60), "\u003c")
     json_ld = (
-        f'<script type="application/ld+json">{json.dumps(ld_breadcrumb, ensure_ascii=False)}</script>\n'
-        f'<script type="application/ld+json">{json.dumps(ld_article, ensure_ascii=False)}</script>'
+        f'<script type="application/ld+json">{_safe_json_ld(ld_breadcrumb)}</script>\n'
+        f'<script type="application/ld+json">{_safe_json_ld(ld_article)}</script>'
     )
     sw_script = (
         "<script>\n"
@@ -262,7 +268,7 @@ def write_sitemap(posts):
         "    <priority>1.0</priority>\n"
         "  </url>"
     ]
-    for p in posts:
+    for p in sorted(posts, key=lambda x: (x["date"], x["slug"])):
         loc = f"{SITE_URL}/writing/{p['slug']}.html"
         lastmod = p.get("date") or today
         urls.append(
