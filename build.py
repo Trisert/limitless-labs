@@ -288,7 +288,7 @@ def write_robots():
 
 
 def escape_xml(text: str) -> str:
-    return text.replace("&", "&").replace("<", "<").replace(">", ">").replace(chr(34), chr(34))
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;").replace("'", "&apos;")
 
 
 def atom_feed(posts):

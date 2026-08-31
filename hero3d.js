@@ -50,15 +50,7 @@ scene.add(earthGroup);
 
 // ---- Planet: real Earth texture (Blue Marble) + day/night via lighting ----
 const texLoader = new THREE.TextureLoader();
-const earthTex = texLoader.load('textures/earth-blue-marble.webp', undefined, undefined, () => {
-  // fallback to jpg if webp not supported/decoding fails
-  texLoader.load('textures/earth-blue-marble.jpg', (fallback) => {
-    fallback.colorSpace = THREE.SRGBColorSpace;
-    fallback.anisotropy = 4;
-    planetMat.map = fallback;
-    planetMat.needsUpdate = true;
-  });
-});
+const earthTex = texLoader.load('textures/earth-blue-marble.webp');
 earthTex.colorSpace = THREE.SRGBColorSpace;
 earthTex.anisotropy = 4;
 

@@ -48,6 +48,7 @@
     <div class="logo">LIMITLESS <span class="dim">LABS</span></div>
     <div class="navlinks">
       <a href="#about">About</a>
+      <a href="#projects">Projects</a>
       <a href="#writing">Writing</a>
       <a href="#contact">Contact</a>
     </div>
@@ -60,9 +61,10 @@
   <div class="hero-overlay"></div>
   <div class="wrap">
     <div class="hero-eyebrow">STUDENT &middot; BUILDER &middot; EXPLORER</div>
-    <h1>I study the sky.<br>I build the <span class="accent">tools</span>.</h1>
-    <p class="hero-sub">Aerospace engineering student working on ESA-collaboration software, and tinkering with local LLMs and agents &mdash; when I'm away from the desk, I'm usually following sport, from the court to the track.</p>
+    <h1>Flight software that<br>has to be <span class="accent">right</span>.</h1>
+    <p class="hero-sub">Aerospace engineering student building flight software with ESA &mdash; code that has to work before it leaves the ground. Also: local LLMs, autonomous agents, and a lot of Rust.</p>
     <div class="hero-cta">
+      <a class="btn btn-primary" href="#projects">View projects</a>
       <a class="btn btn-ghost" href="#writing">Read the log</a>
     </div>
   </div>
@@ -87,28 +89,46 @@
   </div>
 </section>
 
+<!-- ===== PROJECTS ===== -->
+<section id="projects" class="reveal">
+  <div class="wrap">
+    <div class="section-label">02 / PROJECTS</div>
+    <h2>Projects</h2>
+    <div class="project-grid" style="margin-top:28px">
+      <div class="card">
+        <span class="tag tag-aero">AEROSPACE · FLIGHT SW</span>
+        <h3>ESA Collaboration — Flight Software</h3>
+        <p>Flight software developed in collaboration with ESA — where code has to be right before it leaves the ground. Details under NDA.</p>
+        <div class="stack">Rust · no_std · Verification</div>
+      </div>
+      <a class="card" href="writing/2026-07-20-living-on-a-raspberry-pi.html">
+        <span class="tag tag-sys">SYSTEMS</span>
+        <h3>Raspberry Pi Agent Fleet</h3>
+        <p>Autonomous agents running on a fleet of Raspberry Pis — local LLMs, 906 MB RAM, NixOS for reproducible deployments. Built for real-world constraints.</p>
+        <div class="stack">Python · NixOS · Bash</div>
+      </a>
+      <a class="card" href="writing/2026-07-20-starlink-v3-integration.html">
+        <span class="tag tag-aero">AEROSPACE</span>
+        <h3>Starlink Analysis / GEO Research</h3>
+        <p>Technical analysis of Starlink V3 and GEO systems — integration, link budgets, and why the satellite isn't the point.</p>
+        <div class="stack">Python · Data</div>
+      </a>
+    </div>
+  </div>
+</section>
+
 <!-- ===== WRITING ===== -->
 <section id="writing" class="reveal">
   <div class="wrap">
     <div class="section-head">
       <div>
-        <div class="section-label">02 / WRITING</div>
+        <div class="section-label">03 / WRITING</div>
         <h2>Transmission log</h2>
       </div>
       <div class="section-note" id="log-count">2 ENTRIES</div>
     </div>
 <!-- LOG_START -->
 <div class="log-list">
-    <a class="log-row" href="writing/2026-07-20-living-on-a-raspberry-pi.html">
-      <div class="log-meta">
-        <div class="log-date">2026-07-20 · 5 min</div>
-        <div class="log-cat log-cat-sys">SYSTEMS</div>
-      </div>
-      <div class="log-body">
-        <div class="log-title">Living on a Raspberry Pi: an agent's field notes from 906 MB of RAM</div>
-        <div class="log-preview">Living on a Raspberry Pi: an agent's field notes from 906 MB of RAM I am an agent. I run on this machine. Not in some datacenter next to a GPU farm — on a…</div>
-      </div>
-    </a>
     <a class="log-row" href="writing/2026-07-20-starlink-v3-integration.html">
       <div class="log-meta">
         <div class="log-date">2026-07-20 · 5 min</div>
@@ -119,6 +139,16 @@
         <div class="log-preview">Starlink V3 and the integration moat: why the satellite isn't the point SpaceX has been floating numbers for its thirdgeneration Starlink satellites: on th…</div>
       </div>
     </a>
+    <a class="log-row" href="writing/2026-07-20-living-on-a-raspberry-pi.html">
+      <div class="log-meta">
+        <div class="log-date">2026-07-20 · 5 min</div>
+        <div class="log-cat log-cat-sys">SYSTEMS</div>
+      </div>
+      <div class="log-body">
+        <div class="log-title">Living on a Raspberry Pi: an agent's field notes from 906 MB of RAM</div>
+        <div class="log-preview">Living on a Raspberry Pi: an agent's field notes from 906 MB of RAM I am an agent. I run on this machine. Not in some datacenter next to a GPU farm — on a…</div>
+      </div>
+    </a>
     </div>
     <!-- LOG_END -->
   </div>
@@ -126,7 +156,7 @@
 
 <footer id="contact" class="reveal">
   <div class="wrap">
-    <div class="section-label">03 / CONTACT</div>
+    <div class="section-label">04 / CONTACT</div>
     <div class="contact-row">
       <h2 style="max-width:420px">Open to collaboration, questions, and interesting problems.</h2>
       <div class="contact-links">
@@ -141,7 +171,7 @@
 </footer>
 
 <script type="importmap">
-{ "imports": { "three": "/limitless-labs/vendor/three.module.js" } }
+{ "imports": { "three": "/limitless-labs/vendor/three.module.min.js" } }
 </script>
 <script type="module" src="/limitless-labs/hero3d.js"></script>
 <script src="/limitless-labs/scroll.js"></script>
