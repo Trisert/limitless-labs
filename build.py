@@ -13,6 +13,7 @@ Generates:
 
 Run: uv run python build.py
 """
+import html
 import os
 import re
 import subprocess
@@ -127,6 +128,9 @@ def article_page(post):
 
     url = f"{SITE_URL}/writing/{post['slug']}.html"
     desc = post.get("description") or post["title"]
+    # HTML-escape for HTML contexts (title/meta/og), raw for JSON-LD
+    esc_title = html.escape(post['title'], quote=True)
+    esc_desc = html.escape(desc, quote=True)
     date_pub = post.get("date") or ""
     mins = reading_time_minutes(post["html"])
     read_time = f"{mins} min read"
@@ -171,24 +175,24 @@ def article_page(post):
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>{post['title']} — Limitless Labs</title>
-<meta name="description" content="{desc}">
+<title>{esc_title} — Limitless Labs</title>
+<meta name="description" content="{esc_desc}">
 <meta name="author" content="{AUTHOR}">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="{url}">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="Limitless Labs">
-<meta property="og:title" content="{post['title']}">
-<meta property="og:description" content="{desc}">
+<meta property="og:title" content="{esc_title}">
+<meta property="og:description" content="{esc_desc}">
 <meta property="og:url" content="{url}">
 <meta property="og:locale" content="en_US">
 <meta property="og:image" content="{SITE_URL}/og-image.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="{post['title']}">
+<meta property="og:image:alt" content="{esc_title}">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="{post['title']}">
-<meta name="twitter:description" content="{desc}">
+<meta name="twitter:title" content="{esc_title}">
+<meta name="twitter:description" content="{esc_desc}">
 <meta name="twitter:image" content="{SITE_URL}/og-image.jpg">
 {json_ld}
 <link rel="stylesheet" href="../style.css?v=3"/>
@@ -214,19 +218,21 @@ def article_page(post):
 
 def log_rows(posts):
     rows = []
-    for p in sorted(posts, key=lambda x: x["date"], reverse=True):
+    for p in sorted(posts, key=lambda x: (x["date"], x["slug"]), reverse=True):
         cls = CAT_CLASS.get(p["category"], "log-cat-sys")
         label = CAT_LABEL.get(p["category"], p["category"].upper())
         preview = first_paragraph_text(p["html"])
         mins = reading_time_minutes(p["html"])
+        esc_title = html.escape(p['title'], quote=True)
+        esc_preview = html.escape(preview, quote=True)
         rows.append(f"""    <a class="log-row" href="writing/{p['slug']}.html">
       <div class="log-meta">
         <div class="log-date">{p['date']} · {mins} min</div>
         <div class="log-cat {cls}">{label}</div>
       </div>
       <div class="log-body">
-        <div class="log-title">{p['title']}</div>
-        <div class="log-preview">{preview}</div>
+        <div class="log-title">{esc_title}</div>
+        <div class="log-preview">{esc_preview}</div>
       </div>
     </a>""")
     return "\n".join(rows)
@@ -295,7 +301,7 @@ def atom_feed(posts):
     today = datetime.date.today().isoformat()
     feed_updated = f"{today}T00:00:00Z"
     entries = []
-    for p in sorted(posts, key=lambda x: x["date"], reverse=True):
+    for p in sorted(posts, key=lambda x: (x["date"], x["slug"]), reverse=True):
         url = f"{SITE_URL}/writing/{p['slug']}.html"
         summary = p.get("description") or p["title"]
         updated = p.get("date") or today

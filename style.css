@@ -362,7 +362,7 @@ footer{ padding: 64px 0 40px; }
 @media (max-width: 760px){
   .about-grid{ grid-template-columns: 1fr; }
   .project-grid{ grid-template-columns: 1fr; }
-  .navlinks{ display: flex; gap: 16px; font-size: 12px; }
+  .navlinks{ display: flex; gap: 12px; font-size: 11px; flex-wrap: wrap; justify-content: flex-end; }
   .log-row{ grid-template-columns: 1fr; gap: 8px; }
   .hero-3d{ padding: 64px 0 72px; min-height: 62vh; }
   .hero-3d h1{ font-size: clamp(36px, 11vw, 52px); line-height: 1.05; max-width: 100%; }
