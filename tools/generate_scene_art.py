@@ -135,30 +135,31 @@ def canopy_layer():
 def robot_layer():
     image = Image.new("RGBA", (430, 470), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image, "RGBA")
-    # Compact original survey rover: warm hardware against the cool landscape.
-    draw.ellipse((30, 390, 400, 458), fill=(18, 42, 43, 115))
-    draw.rounded_rectangle((98, 238, 335, 408), radius=26, fill=(213, 111, 74, 255), outline=(255, 210, 144, 220), width=7)
-    draw.rounded_rectangle((126, 274, 306, 350), radius=15, fill=(23, 62, 70, 255))
-    draw.rectangle((146, 290, 286, 335), fill=(68, 169, 183, 255))
-    draw.ellipse((164, 302, 180, 318), fill=(219, 243, 177, 255))
-    draw.ellipse((202, 302, 218, 318), fill=(219, 243, 177, 255))
-    draw.ellipse((240, 302, 256, 318), fill=(242, 190, 109, 255))
-    # Antenna / head.
-    draw.rounded_rectangle((145, 120, 285, 250), radius=30, fill=(230, 139, 84, 255), outline=(255, 219, 154, 230), width=7)
-    draw.ellipse((168, 151, 262, 218), fill=(29, 71, 75, 255))
-    draw.ellipse((187, 168, 210, 191), fill=(219, 243, 177, 245))
-    draw.ellipse((226, 168, 249, 191), fill=(219, 243, 177, 245))
-    draw.line((215, 119, 215, 75), fill=(47, 71, 64, 255), width=8)
-    draw.ellipse((201, 51, 229, 79), fill=(242, 198, 113, 255))
-    # Two wheels.
-    for x in (66, 300):
-        draw.ellipse((x, 370, x + 86, 456), fill=(29, 53, 56, 255), outline=(107, 135, 115, 230), width=8)
-        draw.ellipse((x + 27, 397, x + 59, 429), fill=(221, 181, 105, 240))
-    # Articulated arm with a small pencil/flag tip.
-    draw.line((300, 255, 365, 175), fill=(75, 82, 68, 255), width=28)
-    draw.ellipse((347, 145, 385, 190), fill=(226, 145, 80, 255))
-    draw.line((365, 160, 404, 105), fill=(63, 79, 68, 255), width=18)
-    draw.polygon([(398, 104), (425, 110), (401, 121)], fill=(244, 201, 117, 255))
+    # Original industrial writing arm: a warm, low-poly machine over the desk.
+    draw.ellipse((45, 399, 382, 464), fill=(18, 42, 43, 120))
+    draw.rounded_rectangle((92, 320, 308, 432), radius=18, fill=(61, 77, 72, 255), outline=(218, 190, 132, 220), width=7)
+    draw.rectangle((120, 344, 280, 405), fill=(28, 57, 62, 255))
+    draw.rectangle((140, 359, 260, 369), fill=(93, 166, 169, 210))
+    draw.rectangle((140, 381, 228, 390), fill=(93, 166, 169, 150))
+    draw.ellipse((163, 422, 207, 466), fill=(28, 49, 53, 255))
+    draw.ellipse((257, 422, 301, 466), fill=(28, 49, 53, 255))
+
+    # Shoulder and two articulated links.
+    draw.ellipse((88, 232, 190, 334), fill=(213, 132, 73, 255), outline=(255, 218, 151, 230), width=7)
+    draw.ellipse((116, 260, 163, 307), fill=(40, 72, 70, 255))
+    draw.line((142, 270, 238, 154), fill=(228, 157, 88, 255), width=48)
+    draw.line((142, 270, 238, 154), fill=(255, 207, 125, 140), width=11)
+    draw.ellipse((205, 122, 276, 193), fill=(64, 83, 75, 255), outline=(232, 178, 103, 240), width=6)
+    draw.line((241, 157, 331, 92), fill=(55, 79, 75, 255), width=34)
+    draw.line((241, 157, 331, 92), fill=(131, 169, 136, 160), width=8)
+    draw.ellipse((302, 65, 361, 124), fill=(213, 117, 71, 255), outline=(255, 215, 141, 220), width=6)
+
+    # Pencil/gripper aimed at the paper, matching the reference's writing gesture.
+    draw.line((330, 99, 371, 170), fill=(46, 62, 59, 255), width=15)
+    draw.line((366, 160, 392, 226), fill=(239, 193, 112, 255), width=8)
+    draw.polygon([(387, 221), (399, 249), (378, 238)], fill=(45, 60, 58, 255))
+    draw.line((347, 176, 382, 167), fill=(255, 223, 155, 220), width=5)
+    draw.line((349, 186, 384, 177), fill=(255, 223, 155, 160), width=4)
     image.save(OUT / "robot.png", optimize=True)
 
 

@@ -198,11 +198,11 @@ button:focus-visible {
   z-index: 2;
   pointer-events: none;
   background:
-    linear-gradient(90deg, #06333ec4 0%, #05303b66 38%, transparent 74%),
+    linear-gradient(90deg, #06333e70 0%, #05303b20 55%, transparent 76%),
     linear-gradient(
       0deg,
-      #061f28bf 0%,
-      transparent 27%,
+      #061f28b0 0%,
+      transparent 26%,
       transparent 78%,
       #12384825 100%
     );
@@ -665,8 +665,8 @@ body:not(.portfolio) > footer {
   }
   .hero-shade {
     background:
-      linear-gradient(90deg, #063343a8, #06334335),
-      linear-gradient(0deg, #062a36b8, transparent 35%);
+      linear-gradient(90deg, #06334388, #06334325),
+      linear-gradient(0deg, #062a36b0, transparent 35%);
   }
   .work-section,
   .now-section {
@@ -709,7 +709,13 @@ body:not(.portfolio) > footer {
     font-size: 1rem;
   }
   .hero-shade {
-    background: linear-gradient(180deg, #052e3d73, #052e3d2e 50%, #052e3dd0);
+    background: linear-gradient(
+      180deg,
+      #052e3d63,
+      #052e3d2e 50%,
+      #052e3d18 70%,
+      #052e3dad
+    );
   }
   .hero-readout {
     right: 5%;
