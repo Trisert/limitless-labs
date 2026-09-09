@@ -13,8 +13,7 @@
     "format:check": "prettier --plugin=prettier-plugin-astro --check \"src/layouts/**/*.astro\" \"src/pages/**/*.astro\" \"src/pages/**/*.ts\" \"src/scripts/**/*.mjs\" \"src/styles/**/*.css\" \"src/content.config.ts\" \"src/env.d.ts\" \"tests/**/*.mjs\" \"astro.config.mjs\" \"package.json\" \".github/workflows/pages.yml\""
   },
   "dependencies": {
-    "astro": "7.3.1",
-    "three": "0.185.1"
+    "astro": "7.3.1"
   },
   "devDependencies": {
     "prettier": "3.9.6",

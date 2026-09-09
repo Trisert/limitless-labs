@@ -1,262 +1,240 @@
-// Limitless Labs — a small orbital diorama behind the editorial hero.
-// It is decorative only: the poster remains useful if WebGL is unavailable.
-import * as THREE from "three";
-
+// Limitless Labs — original illustrated diorama for the hero.
+// The reference's technique is a layered painted scene, not a WebGL planet:
+// poster -> drifting clouds -> water ripple -> canopy sway -> small rover motion.
 const canvas = document.getElementById("orbitCanvas");
 const hero = document.getElementById("hero");
-const loader = document.querySelector(".scene-loader");
-if (canvas && hero) {
-  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-  const smallScreen = window.matchMedia("(max-width: 600px)");
-  let renderer;
-  try {
-    renderer = new THREE.WebGLRenderer({
-      canvas,
-      alpha: true,
-      antialias: true,
+const landscape = hero?.querySelector(".landscape");
+const loader = hero?.querySelector(".scene-loader");
+
+if (canvas && hero && landscape) {
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const context = canvas.getContext("2d");
+  const logical = { width: 1672, height: 941 };
+  const sources = {
+    backdrop: hero.dataset.sceneBackdrop,
+    cloud: hero.dataset.sceneCloud,
+    canopy: hero.dataset.sceneCanopy,
+    robot: hero.dataset.sceneRobot,
+  };
+  let images;
+  let frame = 0;
+  let visible = true;
+  let last = performance.now();
+  let time = 0;
+  let pointerX = 0;
+  let targetPointerX = 0;
+  let viewport = { width: 0, height: 0, dpr: 1, scale: 1, left: 0, top: 0 };
+
+  const loadImage = (src) =>
+    new Promise((resolve, reject) => {
+      const image = new Image();
+      image.decoding = "async";
+      image.onload = () => resolve(image);
+      image.onerror = reject;
+      image.src = src;
     });
-    renderer.setPixelRatio(
-      Math.min(window.devicePixelRatio || 1, smallScreen.matches ? 1.4 : 1.8),
+
+  function fitViewport() {
+    const rect = landscape.getBoundingClientRect();
+    if (!rect.width || !rect.height || !context) return false;
+    viewport.width = rect.width;
+    viewport.height = rect.height;
+    viewport.dpr = Math.min(window.devicePixelRatio || 1, 1.35);
+    viewport.scale = Math.max(
+      rect.width / logical.width,
+      rect.height / logical.height,
     );
-    renderer.setClearColor(0x000000, 0);
-  } catch (error) {
-    console.warn("Orbital scene disabled:", error);
+    viewport.left = logical.width - rect.width / viewport.scale;
+    viewport.top = (logical.height - rect.height / viewport.scale) / 2;
+    canvas.width = Math.round(rect.width * viewport.dpr);
+    canvas.height = Math.round(rect.height * viewport.dpr);
+    return true;
+  }
+
+  function beginSceneTransform() {
+    context.setTransform(
+      viewport.scale * viewport.dpr,
+      0,
+      0,
+      viewport.scale * viewport.dpr,
+      -viewport.left * viewport.scale * viewport.dpr,
+      -viewport.top * viewport.scale * viewport.dpr,
+    );
+  }
+
+  function drawClouds(seconds) {
+    const layers = [
+      { y: 72, width: 650, alpha: 0.78, speed: 7, offset: 40 },
+      { y: 238, width: 340, alpha: 0.62, speed: 14, offset: 530 },
+      { y: 305, width: 235, alpha: 0.52, speed: 21, offset: 220 },
+    ];
+    for (const layer of layers) {
+      const height = (layer.width * images.cloud.height) / images.cloud.width;
+      const period = 1780;
+      const travel = (layer.offset + seconds * layer.speed) % period;
+      context.globalAlpha = layer.alpha;
+      for (let i = -1; i < 3; i += 1) {
+        const x = travel + i * period - 780;
+        context.drawImage(images.cloud, x, layer.y, layer.width, height);
+      }
+    }
+    context.globalAlpha = 1;
+  }
+
+  function drawWater(seconds) {
+    context.save();
+    context.beginPath();
+    context.moveTo(190, 941);
+    context.lineTo(420, 850);
+    context.lineTo(610, 780);
+    context.lineTo(780, 735);
+    context.lineTo(1000, 725);
+    context.lineTo(1200, 755);
+    context.lineTo(1510, 895);
+    context.lineTo(1672, 925);
+    context.lineTo(1672, 941);
+    context.closePath();
+    context.clip();
+    context.fillStyle = "rgba(82, 169, 197, 0.34)";
+    context.fillRect(150, 700, 1550, 260);
+    context.lineWidth = 3;
+    for (let y = 735; y < 930; y += 18) {
+      const shift =
+        Math.sin(y * 0.035 + seconds * 1.8) * 8 +
+        Math.sin(seconds * 0.7 + y * 0.08) * 3;
+      context.strokeStyle = `rgba(193, 230, 218, ${0.16 + (y % 54) / 400})`;
+      context.beginPath();
+      context.moveTo(250 + shift, y);
+      context.quadraticCurveTo(720 + shift, y - 7, 1160 + shift, y + 4);
+      context.stroke();
+    }
+    context.restore();
+  }
+
+  function drawCanopy(seconds) {
+    const sway =
+      Math.sin(seconds * 0.42) * 5 +
+      Math.sin(seconds * 0.17) * 2 +
+      pointerX * 12;
+    context.save();
+    context.translate(sway, Math.sin(seconds * 0.33) * 1.5);
+    context.globalAlpha = 0.96;
+    context.drawImage(images.canopy, 0, 0, logical.width, logical.height);
+    context.restore();
+    context.globalAlpha = 1;
+  }
+
+  function drawRover(seconds) {
+    const bob = Math.sin(seconds * 1.2) * 2.2;
+    const drift = pointerX * 7;
+    context.save();
+    context.translate(1176 + drift, 293 + bob);
+    context.rotate(Math.sin(seconds * 0.42) * 0.018 + pointerX * 0.006);
+    context.drawImage(images.robot, 0, 0, 430, 470);
+    context.restore();
+
+    // A restrained survey beam and a blinking desk trace sell the mechanical loop.
+    context.save();
+    context.globalAlpha = 0.28 + (Math.sin(seconds * 2.1) + 1) * 0.08;
+    context.strokeStyle = "#d8f1a4";
+    context.lineWidth = 3;
+    context.beginPath();
+    context.moveTo(1550 + drift, 408 + bob);
+    context.lineTo(1500 + drift, 514);
+    context.stroke();
+    context.globalAlpha = 0.75;
+    context.strokeStyle = "#f4c975";
+    context.lineWidth = 2;
+    context.beginPath();
+    context.moveTo(1280, 632);
+    for (let i = 0; i < 8; i += 1) {
+      const x = 1280 + i * 31;
+      const y = 632 + Math.sin(seconds * 1.2 + i * 0.8) * 4;
+      context.lineTo(x, y);
+    }
+    context.stroke();
+    context.restore();
+  }
+
+  function render(seconds) {
+    if (!context || !images || !viewport.width || !viewport.height) return;
+    context.setTransform(1, 0, 0, 1, 0, 0);
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    beginSceneTransform();
+    context.drawImage(images.backdrop, 0, 0, logical.width, logical.height);
+    drawClouds(seconds);
+    drawWater(seconds);
+    drawCanopy(seconds);
+    drawRover(seconds);
+    context.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
+  function resize() {
+    if (fitViewport()) render(time);
+  }
+
+  function tick(now) {
+    frame = 0;
+    if (!visible || document.hidden || reducedMotion.matches) return;
+    const delta = Math.min(0.08, (now - last) / 1000);
+    last = now;
+    time += delta;
+    pointerX += (targetPointerX - pointerX) * 0.035;
+    render(time);
+    frame = requestAnimationFrame(tick);
+  }
+
+  function resume() {
+    cancelAnimationFrame(frame);
+    last = performance.now();
+    if (!reducedMotion.matches && visible && !document.hidden) {
+      frame = requestAnimationFrame(tick);
+    } else {
+      render(0);
+    }
+  }
+
+  function fail(error) {
+    console.warn("Illustrated scene disabled:", error);
+    cancelAnimationFrame(frame);
+    canvas.remove();
     loader?.remove();
   }
 
-  if (renderer) {
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
-    camera.position.set(0, 0.35, 7.2);
-
-    scene.add(new THREE.HemisphereLight(0xc8f0e2, 0x063442, 1.8));
-    const key = new THREE.DirectionalLight(0xffdf9b, 2.4);
-    key.position.set(-3, 4, 5);
-    scene.add(key);
-    const rim = new THREE.DirectionalLight(0x9cdbd4, 1.5);
-    rim.position.set(5, -1, -3);
-    scene.add(rim);
-
-    const orbiting = new THREE.Group();
-    orbiting.position.set(1.15, 0.1, 0);
-    scene.add(orbiting);
-
-    const planetMaterial = new THREE.MeshStandardMaterial({
-      color: 0x2c8791,
-      roughness: 0.95,
-      metalness: 0,
-      emissive: new THREE.Color(0x0a2931),
-      emissiveIntensity: 0.28,
-    });
-    const planet = new THREE.Mesh(
-      new THREE.IcosahedronGeometry(1.55, 5),
-      planetMaterial,
-    );
-    orbiting.add(planet);
-
-    const textureLoader = new THREE.TextureLoader();
-    textureLoader.load(
-      hero.dataset.earthTexture || "textures/earth-blue-marble.webp",
-      (texture) => {
-        texture.colorSpace = THREE.SRGBColorSpace;
-        texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
-        planetMaterial.map = texture;
-        planetMaterial.needsUpdate = true;
-      },
-      undefined,
-      () =>
-        console.warn("Orbital texture unavailable; using fallback material."),
-    );
-
-    const halo = new THREE.Mesh(
-      new THREE.SphereGeometry(1.74, 24, 16),
-      new THREE.MeshBasicMaterial({
-        color: 0xb9e6c1,
-        transparent: true,
-        opacity: 0.08,
-        side: THREE.BackSide,
-      }),
-    );
-    orbiting.add(halo);
-
-    const ringDefinitions = [
-      { radius: 2.15, tube: 0.012, color: 0xd8f1a4, tilt: 0.38, speed: 0.18 },
-      { radius: 2.65, tube: 0.009, color: 0xf4c975, tilt: -0.55, speed: -0.12 },
-      { radius: 3.2, tube: 0.006, color: 0xb9e6c1, tilt: 0.92, speed: 0.08 },
-    ];
-    const rings = [];
-    for (const definition of ringDefinitions) {
-      const ring = new THREE.Mesh(
-        new THREE.TorusGeometry(definition.radius, definition.tube, 8, 160),
-        new THREE.MeshBasicMaterial({
-          color: definition.color,
-          transparent: true,
-          opacity: 0.65,
-        }),
+  async function start() {
+    try {
+      if (!context || Object.values(sources).some((source) => !source))
+        throw new Error("Scene assets missing");
+      images = Object.fromEntries(
+        await Promise.all(
+          Object.entries(sources).map(async ([key, source]) => [
+            key,
+            await loadImage(source),
+          ]),
+        ),
       );
-      ring.rotation.x = Math.PI / 2 + definition.tilt;
-      ring.rotation.z = definition.tilt * 0.4;
-      scene.add(ring);
-      rings.push({ ring, speed: definition.speed });
-    }
-
-    function satellite(scale = 1) {
-      const group = new THREE.Group();
-      const body = new THREE.Mesh(
-        new THREE.BoxGeometry(0.16 * scale, 0.2 * scale, 0.2 * scale),
-        new THREE.MeshStandardMaterial({
-          color: 0xe4eee1,
-          roughness: 0.6,
-          metalness: 0.2,
-        }),
-      );
-      group.add(body);
-      const solar = new THREE.MeshBasicMaterial({ color: 0x234c6a });
-      for (const side of [-1, 1]) {
-        const panel = new THREE.Mesh(
-          new THREE.BoxGeometry(0.36 * scale, 0.012 * scale, 0.18 * scale),
-          solar,
-        );
-        panel.position.x = side * 0.27 * scale;
-        group.add(panel);
-      }
-      return group;
-    }
-
-    const satellites = ringDefinitions.map((definition, index) => {
-      const craft = satellite(index === 1 ? 0.8 : 1);
-      craft.position.set(1.15 + definition.radius, 0.1, 0.1);
-      craft.rotation.z = 0.3;
-      scene.add(craft);
-      return {
-        craft,
-        radius: definition.radius,
-        speed: definition.speed,
-        phase: index * 2.1,
-      };
-    });
-
-    const platform = new THREE.Mesh(
-      new THREE.CylinderGeometry(2.25, 2.75, 0.16, 40),
-      new THREE.MeshStandardMaterial({
-        color: 0x0d5662,
-        roughness: 0.9,
-        metalness: 0.05,
-      }),
-    );
-    platform.position.set(1.15, -1.68, 0);
-    platform.rotation.x = 0.06;
-    scene.add(platform);
-    const platformLine = new THREE.Mesh(
-      new THREE.TorusGeometry(2.26, 0.018, 8, 96),
-      new THREE.MeshBasicMaterial({
-        color: 0xd8f1a4,
-        transparent: true,
-        opacity: 0.65,
-      }),
-    );
-    platformLine.position.copy(platform.position);
-    platformLine.rotation.copy(platform.rotation);
-    scene.add(platformLine);
-
-    const starGeometry = new THREE.BufferGeometry();
-    const starPositions = new Float32Array(
-      (smallScreen.matches ? 180 : 360) * 3,
-    );
-    for (let i = 0; i < starPositions.length; i += 3) {
-      const radius = 8 + Math.random() * 10;
-      const angle = Math.random() * Math.PI * 2;
-      starPositions[i] = Math.cos(angle) * radius;
-      starPositions[i + 1] = (Math.random() - 0.5) * 8;
-      starPositions[i + 2] = -2 - Math.random() * 5;
-    }
-    starGeometry.setAttribute(
-      "position",
-      new THREE.BufferAttribute(starPositions, 3),
-    );
-    scene.add(
-      new THREE.Points(
-        starGeometry,
-        new THREE.PointsMaterial({
-          color: 0xd8f1a4,
-          size: 0.035,
-          transparent: true,
-          opacity: 0.8,
-        }),
-      ),
-    );
-
-    let frame = 0;
-    let last = performance.now();
-    let visible = true;
-    let targetX = 0;
-    let targetY = 0;
-    let currentX = 0;
-    let currentY = 0;
-    function resize() {
-      const rect = hero.getBoundingClientRect();
-      if (!rect.width || !rect.height) return;
-      renderer.setSize(rect.width, rect.height, false);
-      camera.aspect = rect.width / rect.height;
-      camera.updateProjectionMatrix();
-      render();
-    }
-    function render() {
-      renderer.render(scene, camera);
-    }
-    function tick(now) {
-      frame = 0;
-      if (!visible || document.hidden || reduceMotion.matches) return;
-      const delta = Math.min(0.05, (now - last) / 1000);
-      last = now;
-      currentX += (targetX - currentX) * 0.035;
-      currentY += (targetY - currentY) * 0.035;
-      orbiting.rotation.x = currentY * 0.3;
-      orbiting.rotation.y += 0.08 * delta + currentX * 0.004;
-      planet.rotation.y += 0.1 * delta;
-      rings.forEach(({ ring, speed }) => {
-        ring.rotation.y += speed * delta;
+      new ResizeObserver(resize).observe(landscape);
+      window.addEventListener("resize", resize, { passive: true });
+      hero.addEventListener("pointermove", (event) => {
+        const rect = hero.getBoundingClientRect();
+        targetPointerX = (event.clientX - rect.left) / rect.width - 0.5;
       });
-      satellites.forEach(({ craft, radius, speed, phase }) => {
-        const angle = (performance.now() / 1000) * speed + phase;
-        craft.position.set(
-          1.15 + Math.cos(angle) * radius,
-          0.1 + Math.sin(angle) * radius * 0.38,
-          Math.sin(angle) * 0.75,
-        );
-        craft.lookAt(1.15, 0.1, 0);
+      hero.addEventListener("pointerleave", () => {
+        targetPointerX = 0;
       });
-      render();
-      frame = requestAnimationFrame(tick);
-    }
-    function resume() {
-      cancelAnimationFrame(frame);
-      last = performance.now();
-      if (!reduceMotion.matches && visible && !document.hidden)
-        frame = requestAnimationFrame(tick);
-      else render();
-    }
-
-    hero.addEventListener("pointermove", (event) => {
-      const rect = hero.getBoundingClientRect();
-      targetX = (event.clientX - rect.left) / rect.width - 0.5;
-      targetY = (event.clientY - rect.top) / rect.height - 0.5;
-    });
-    hero.addEventListener("pointerleave", () => {
-      targetX = 0;
-      targetY = 0;
-    });
-    reduceMotion.addEventListener("change", resume);
-    document.addEventListener("visibilitychange", resume);
-    new IntersectionObserver(([entry]) => {
-      visible = entry.isIntersecting;
+      reducedMotion.addEventListener("change", resume);
+      document.addEventListener("visibilitychange", resume);
+      new IntersectionObserver(([entry]) => {
+        visible = entry.isIntersecting;
+        resume();
+      }).observe(hero);
+      resize();
+      loader?.remove();
       resume();
-    }).observe(hero);
-    new ResizeObserver(resize).observe(hero);
-    window.addEventListener("resize", resize, { passive: true });
-    window.addEventListener("pagehide", () => cancelAnimationFrame(frame));
-    resize();
-    resume();
-    window.setTimeout(() => loader?.remove(), 1200);
+    } catch (error) {
+      fail(error);
+    }
   }
+
+  start();
 }

@@ -12,9 +12,11 @@ test("homepage uses Nicola content and keeps the reference structure", () => {
   assert.doesNotMatch(homepage, /Varun|Avici|fixmahbug|varunlohade/);
 });
 
-test("hero scene remains self-contained and has a poster fallback", () => {
-  assert.match(scene, /from ["']three["']/);
-  assert.match(scene, /hero\.dataset\.earthTexture/);
-  assert.match(homepage, /class="hero-poster"/);
+test("hero scene is a layered illustrated diorama with a poster fallback", () => {
+  assert.match(scene, /getContext\("2d"\)/);
+  assert.match(scene, /hero\.dataset\.sceneBackdrop/);
+  assert.match(scene, /hero\.dataset\.sceneRobot/);
   assert.match(scene, /prefers-reduced-motion/);
+  assert.match(homepage, /class="landscape"/);
+  assert.match(homepage, /class="scene-poster"|id="scene-poster"/);
 });

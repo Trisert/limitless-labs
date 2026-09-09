@@ -41,14 +41,26 @@ const formatDate = (date: Date) =>
       class="hero"
       id="hero"
       aria-labelledby="hero-heading"
-      data-earth-texture={`${base}textures/earth-blue-marble.webp`}
+      data-scene-backdrop={`${base}art/backdrop.png`}
+      data-scene-cloud={`${base}art/cloud.png`}
+      data-scene-canopy={`${base}art/canopy.png`}
+      data-scene-robot={`${base}art/robot.png`}
     >
-      <div class="hero-poster" aria-hidden="true"></div>
-      <canvas class="hero-canvas" id="orbitCanvas" aria-hidden="true"></canvas>
+      <div class="landscape" aria-hidden="true">
+        <img
+          id="scene-poster"
+          src={`${base}art/backdrop.png`}
+          alt=""
+          fetchpriority="high"
+          width="1672"
+          height="941"
+        />
+        <canvas class="hero-canvas" id="orbitCanvas"></canvas>
+      </div>
       <div class="hero-shade" aria-hidden="true"></div>
       <div class="scene-loader" role="status">
-        <span class="scene-loader-dot" aria-hidden="true"></span>Loading orbital
-        model…
+        <span class="scene-loader-dot" aria-hidden="true"></span>Loading
+        illustrated scene…
       </div>
       <div class="hero-copy">
         <p class="eyebrow">Aerospace · AI on the edge · Running</p>
