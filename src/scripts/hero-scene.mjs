@@ -1,6 +1,6 @@
 // Limitless Labs — original illustrated diorama for the hero.
 // The reference's technique is a layered painted scene, not a WebGL planet:
-// poster -> drifting clouds -> water ripple -> canopy sway -> small rover motion.
+// poster -> soft drifting mist -> water ripple -> survey arm motion.
 const canvas = document.getElementById("orbitCanvas");
 const hero = document.getElementById("hero");
 const landscape = hero?.querySelector(".landscape");
@@ -13,7 +13,6 @@ if (canvas && hero && landscape) {
   const sources = {
     backdrop: hero.dataset.sceneBackdrop,
     cloud: hero.dataset.sceneCloud,
-    canopy: hero.dataset.sceneCanopy,
     robot: hero.dataset.sceneRobot,
   };
   let images;
@@ -63,11 +62,15 @@ if (canvas && hero && landscape) {
   }
 
   function drawClouds(seconds) {
+    // The painted sky already has clouds; these are soft drifting mist
+    // layers only, blurred so no hard vector edge shows over the painting.
     const layers = [
-      { y: 72, width: 650, alpha: 0.78, speed: 7, offset: 40 },
-      { y: 238, width: 340, alpha: 0.62, speed: 14, offset: 530 },
-      { y: 305, width: 235, alpha: 0.52, speed: 21, offset: 220 },
+      { y: 72, width: 650, alpha: 0.5, speed: 7, offset: 40 },
+      { y: 238, width: 340, alpha: 0.38, speed: 14, offset: 530 },
+      { y: 305, width: 235, alpha: 0.32, speed: 21, offset: 220 },
     ];
+    context.save();
+    context.filter = "blur(6px)";
     for (const layer of layers) {
       const height = (layer.width * images.cloud.height) / images.cloud.width;
       const period = 1780;
@@ -78,81 +81,48 @@ if (canvas && hero && landscape) {
         context.drawImage(images.cloud, x, layer.y, layer.width, height);
       }
     }
+    context.restore();
     context.globalAlpha = 1;
   }
 
   function drawWater(seconds) {
     context.save();
     context.beginPath();
-    context.moveTo(190, 941);
-    context.lineTo(420, 850);
-    context.lineTo(610, 780);
-    context.lineTo(780, 735);
-    context.lineTo(1000, 725);
-    context.lineTo(1200, 755);
-    context.lineTo(1510, 895);
-    context.lineTo(1672, 925);
-    context.lineTo(1672, 941);
+    context.moveTo(700, 815);
+    context.lineTo(830, 738);
+    context.lineTo(1010, 696);
+    context.lineTo(1220, 690);
+    context.lineTo(1420, 730);
+    context.lineTo(1505, 778);
+    context.lineTo(1505, 815);
     context.closePath();
     context.clip();
-    context.fillStyle = "rgba(82, 169, 197, 0.34)";
-    context.fillRect(150, 700, 1550, 260);
+    context.fillStyle = "rgba(82, 169, 197, 0.22)";
+    context.fillRect(650, 660, 900, 160);
     context.lineWidth = 3;
-    for (let y = 735; y < 930; y += 18) {
+    for (let y = 698; y < 810; y += 18) {
       const shift =
         Math.sin(y * 0.035 + seconds * 1.8) * 8 +
         Math.sin(seconds * 0.7 + y * 0.08) * 3;
-      context.strokeStyle = `rgba(193, 230, 218, ${0.16 + (y % 54) / 400})`;
+      context.strokeStyle = `rgba(193, 230, 218, ${0.14 + (y % 54) / 450})`;
       context.beginPath();
-      context.moveTo(250 + shift, y);
-      context.quadraticCurveTo(720 + shift, y - 7, 1160 + shift, y + 4);
+      context.moveTo(750 + shift, y);
+      context.quadraticCurveTo(1100 + shift, y - 6, 1450 + shift, y + 3);
       context.stroke();
     }
     context.restore();
   }
 
-  function drawCanopy(seconds) {
-    const sway =
-      Math.sin(seconds * 0.42) * 5 +
-      Math.sin(seconds * 0.17) * 2 +
-      pointerX * 12;
-    context.save();
-    context.translate(sway, Math.sin(seconds * 0.33) * 1.5);
-    context.globalAlpha = 0.96;
-    context.drawImage(images.canopy, 0, 0, logical.width, logical.height);
-    context.restore();
-    context.globalAlpha = 1;
-  }
-
   function drawRover(seconds) {
+    // On narrow viewports the painted scene carries the hero alone: the
+    // sprite would sit under the copy/CTA stack (cover crops to the right).
+    if (viewport.width && viewport.width < 700) return;
     const bob = Math.sin(seconds * 1.2) * 2.2;
     const drift = pointerX * 7;
     context.save();
-    context.translate(1176 + drift, 293 + bob);
+    context.translate(1176 + drift, 443 + bob);
     context.rotate(Math.sin(seconds * 0.42) * 0.018 + pointerX * 0.006);
     context.drawImage(images.robot, 0, 0, 430, 470);
-    context.restore();
-
-    // A restrained survey beam and a blinking desk trace sell the mechanical loop.
-    context.save();
-    context.globalAlpha = 0.28 + (Math.sin(seconds * 2.1) + 1) * 0.08;
-    context.strokeStyle = "#d8f1a4";
-    context.lineWidth = 3;
-    context.beginPath();
-    context.moveTo(1550 + drift, 408 + bob);
-    context.lineTo(1500 + drift, 514);
-    context.stroke();
-    context.globalAlpha = 0.75;
-    context.strokeStyle = "#f4c975";
-    context.lineWidth = 2;
-    context.beginPath();
-    context.moveTo(1280, 632);
-    for (let i = 0; i < 8; i += 1) {
-      const x = 1280 + i * 31;
-      const y = 632 + Math.sin(seconds * 1.2 + i * 0.8) * 4;
-      context.lineTo(x, y);
-    }
-    context.stroke();
     context.restore();
   }
 
@@ -164,7 +134,6 @@ if (canvas && hero && landscape) {
     context.drawImage(images.backdrop, 0, 0, logical.width, logical.height);
     drawClouds(seconds);
     drawWater(seconds);
-    drawCanopy(seconds);
     drawRover(seconds);
     context.setTransform(1, 0, 0, 1, 0, 0);
   }

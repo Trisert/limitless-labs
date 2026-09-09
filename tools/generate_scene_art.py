@@ -39,6 +39,11 @@ def composite_glow(base, center, radius, color, alpha):
 
 
 def backdrop():
+    # Retired: the hero base is now an original AI-painted illustration
+    # (public/art/backdrop-ai.jpg, see tools/fetch_backdrop.py). This stub
+    # stays so `generate_scene_art.py` keeps producing cloud/canopy/robot
+    # without recreating the old procedural backdrop.png.
+    return
     image = gradient((W, H), (35, 112, 169), (157, 211, 211), 0.7)
     draw = ImageDraw.Draw(image, "RGBA")
     composite_glow(image, (1365, 222), 185, (255, 222, 139), 70)
@@ -154,18 +159,13 @@ def robot_layer():
     draw.line((241, 157, 331, 92), fill=(131, 169, 136, 160), width=8)
     draw.ellipse((302, 65, 361, 124), fill=(213, 117, 71, 255), outline=(255, 215, 141, 220), width=6)
 
-    # Pencil/gripper aimed at the paper, matching the reference's writing gesture.
-    draw.line((330, 99, 371, 170), fill=(46, 62, 59, 255), width=15)
-    draw.line((366, 160, 392, 226), fill=(239, 193, 112, 255), width=8)
-    draw.polygon([(387, 221), (399, 249), (378, 238)], fill=(45, 60, 58, 255))
-    draw.line((347, 176, 382, 167), fill=(255, 223, 155, 220), width=5)
-    draw.line((349, 186, 384, 177), fill=(255, 223, 155, 160), width=4)
+    # Gripper jaws close on empty air; the survey beam carries the gesture.
     image.save(OUT / "robot.png", optimize=True)
 
 
 if __name__ == "__main__":
-    backdrop()
+    backdrop()  # retired stub, no output
     cloud_layer()
-    canopy_layer()
+    # canopy_layer() retired: hero now uses the painted foliage in backdrop-ai.jpg
     robot_layer()
     print(f"Generated original hero layers in {OUT}")
