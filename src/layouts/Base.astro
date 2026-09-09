@@ -1,0 +1,58 @@
+---
+interface Props {
+  title?: string;
+  description?: string;
+  bodyClass?: string;
+}
+
+const {
+  title = "Nicola Destro — Limitless Labs",
+  description = "Nicola Destro — aerospace engineering student building flight software, local AI systems, and tools that survive contact with hardware.",
+  bodyClass = "",
+} = Astro.props;
+const base = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/`;
+const siteUrl = "https://trisert.github.io/limitless-labs/";
+const pathname = Astro.url.pathname.startsWith(base)
+  ? Astro.url.pathname.slice(base.length)
+  : Astro.url.pathname.replace(/^\/+/, "");
+const canonicalPath = pathname === "index.html" ? "" : pathname;
+const canonical = new URL(canonicalPath, siteUrl);
+
+import "../styles/site.css";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <meta name="theme-color" content="#0c4f61" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="author" content="Nicola Destro" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href={canonical} />
+    <link rel="manifest" href={`${base}manifest.json`} />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Limitless Labs" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:image" content={`${siteUrl}og-image.jpg`} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={`${siteUrl}og-image.jpg`} />
+  </head>
+  <body class={bodyClass}>
+    <slot />
+  </body>
+</html>

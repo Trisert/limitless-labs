@@ -1,39 +1,44 @@
 # Limitless Labs
 
-A field-journal of experiments, research, and real measurements on self-hosting,
-low-power computing, and AI-on-the-edge — run from a Raspberry Pi 3 (906 MB RAM).
+Personal portfolio for Nicola Destro: aerospace software, local AI systems, and field notes measured against real constraints.
 
-This is **not a tutorial collection.** It is a log of what we actually did, measured,
-and concluded while working together. Every entry is dated, sourced, and grounded in
-real hardware — the kind of first-hand experience that survives the shift from
-"search for an answer" to "ask an agent."
+## Stack
 
-## Why this exists
+- Astro static output with a small Three.js orbital scene.
+- Markdown posts in `src/content/posts/` rendered to `/writing/<slug>.html`.
+- No runtime API, analytics, cookies, remote fonts, or CDN dependencies.
+- GitHub Pages deployment through `.github/workflows/pages.yml`.
 
-Search traffic to how-to content is collapsing:
-- Zero-click results now exceed **two-thirds** of Google searches (SparkToro, 2026).
-- AI Overviews cut the #1-position click-through rate by **~58%** (Ahrefs, Feb 2026).
-- Organic traffic is estimated down **15–25%** (Bain & Co, 2025).
+## Local development
 
-So we don't write "how-to" posts an LLM can answer in chat. We publish **our own
-research and measurements** — experience, statistics, and conclusions that generative
-engines cite (see GEO: Aggarwal et al., arXiv:2311.09735).
+Requires Node 24 or newer:
 
-## Structure
+```sh
+npm ci
+npm run dev
+npm test
+npm run build
+npm run preview
+```
 
-- `notes/` — dated research entries (the core of the repo).
-- `tools/` — small utilities we actually use on the Pi (not tutorials).
+The production path is `/limitless-labs/`, matching the project-site URL:
+`https://trisert.github.io/limitless-labs/`.
 
-## Hardware baseline (measured 2026-07-18)
+## Content
 
-| Resource | Value |
-|----------|-------|
-| Board | Raspberry Pi 3 Model B+ (aarch64) |
-| OS | Debian 12 (bookworm) |
-| Total RAM | 906 MB (330 MB available under load) |
-| Swap | 511 MB |
-| Free disk | 5.9 GB / 15 GB |
-| Docker | 20.10.24 |
-| Tailscale | active (100.73.100.125) |
+Add a Markdown file under `src/content/posts/` with frontmatter:
 
-License: MIT.
+```yaml
+---
+title: A measured title
+date: 2026-09-09
+category: systems
+description: A short field-note summary.
+---
+```
+
+The homepage and field-note index sort published posts deterministically by date and slug. Drafts stay out of the build.
+
+## Deployment
+
+The repository must use **GitHub Actions** as its Pages source. In the repository settings, set Pages → Build and deployment → Source to `GitHub Actions`; the workflow builds `dist/` and deploys it. The existing project-site prefix is configured in `astro.config.mjs` and must not be removed.

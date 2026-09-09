@@ -1,12 +1,12 @@
 {
   "name": "Limitless Labs",
   "short_name": "Limitless",
-  "description": "Personal portfolio and transmission log.",
+  "description": "Nicola Destro — space, edge AI, and field notes from real constraints.",
   "start_url": "/limitless-labs/",
   "scope": "/limitless-labs/",
   "display": "standalone",
-  "background_color": "#14171C",
-  "theme_color": "#FFB000",
+  "background_color": "#f8faf6",
+  "theme_color": "#0c4f61",
   "icons": [
     {
       "src": "/limitless-labs/favicon.ico",

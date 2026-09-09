@@ -1,0 +1,39 @@
+---
+import Base from "../../layouts/Base.astro";
+import { getCollection, render, type CollectionEntry } from "astro:content";
+
+export async function getStaticPaths() {
+  const posts = await getCollection("posts", ({ data }) => !data.draft);
+  return posts.map((post) => ({ params: { slug: post.id }, props: { post } }));
+}
+
+interface Props {
+  post: CollectionEntry<"posts">;
+}
+const { post } = Astro.props;
+const { Content } = await render(post);
+const base = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/`;
+const date = post.data.date.toISOString().slice(0, 10);
+---
+
+<Base
+  title={`${post.data.title} — Limitless Labs`}
+  description={post.data.description ?? post.data.title}
+  bodyClass="post"
+>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <main id="main-content">
+    <div class="wrap">
+      <p class="back"><a href={`${base}writing.html`}>← field notes</a></p>
+      <p class="log-date">{post.data.category} · {date}</p>
+      <div class="prose"><Content /></div>
+      <p class="article-back">
+        <a href={`${base}#writing`}>← back to homepage</a>
+      </p>
+      <p class="article-meta">Nicola Destro · Limitless Labs</p>
+    </div>
+  </main>
+  <footer>
+    <div class="wrap article-footer">Built on Earth, aimed at orbit.</div>
+  </footer>
+</Base>
