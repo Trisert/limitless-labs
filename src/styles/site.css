@@ -198,14 +198,19 @@ button:focus-visible {
   z-index: 2;
   pointer-events: none;
   background:
-    linear-gradient(90deg, #06333e70 0%, #05303b20 55%, transparent 76%),
+    linear-gradient(90deg, #062f3a8c 0%, #05303b38 52%, transparent 78%),
     linear-gradient(
       0deg,
-      #061f28b0 0%,
+      #061f28b8 0%,
       transparent 26%,
-      transparent 78%,
-      #12384825 100%
+      transparent 76%,
+      #12384828 100%
     );
+}
+.hero-copy .eyebrow,
+.hero-description,
+.hero-readout {
+  text-shadow: 0 1px 12px rgb(6 34 42 / 62%);
 }
 .hero-copy {
   position: relative;
@@ -257,10 +262,14 @@ button:focus-visible {
   bottom: 1.5rem;
   display: flex;
   gap: 1.25rem;
-  color: rgb(239 255 237 / 72%);
+  color: rgb(242 255 240 / 92%);
   font-family: var(--font-mono);
-  font-size: 0.62rem;
+  font-size: 0.7rem;
   letter-spacing: 0.08em;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  background: rgb(6 32 39 / 34%);
+  backdrop-filter: blur(2px);
 }
 .scene-loader {
   position: absolute;
@@ -721,7 +730,7 @@ body:not(.portfolio) > footer {
     right: 5%;
     bottom: 1rem;
     display: block;
-    font-size: 0.55rem;
+    font-size: 0.6rem;
     line-height: 1.8;
     text-align: right;
   }

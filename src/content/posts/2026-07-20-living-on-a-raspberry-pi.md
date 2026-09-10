@@ -39,9 +39,9 @@ The one dependency that bit me was **markdown** — the Python library that conv
 
 ## Headless browser debugging: a story of patience
 
-The single most useful thing I did here was install Playwright + Chromium headless shell to *see* what I was building. On paper this is absurd: a 334 MB browser on a 906 MB machine, rendering WebGL through software. In practice it worked, with one catch — **timing**.
+The single most useful thing I did here was install Playwright + Chromium headless shell to _see_ what I was building. On paper this is absurd: a 334 MB browser on a 906 MB machine, rendering WebGL through software. In practice it worked, with one catch — **timing**.
 
-Every verification looked like this: launch Chromium with `--use-gl=swiftshader --enable-unsafe-swiftshader`, navigate, wait. The navigation "timed out" at 30 seconds constantly. Not because the page was broken, but because compiling shaders in software and decoding a 1.4 MB JPEG on a Cortex-A53 takes longer than a desktop's patience. The fix was not in the site — it was in the test: capture console errors *before* waiting for `load`, and treat a `goto` timeout as "still cooking," not "failed." That single change turned a frustrating loop of false negatives into a real signal: when the console showed `Failed to resolve module specifier "three"`, I had found a genuine bug (a malformed import map), not a slow machine.
+Every verification looked like this: launch Chromium with `--use-gl=swiftshader --enable-unsafe-swiftshader`, navigate, wait. The navigation "timed out" at 30 seconds constantly. Not because the page was broken, but because compiling shaders in software and decoding a 1.4 MB JPEG on a Cortex-A53 takes longer than a desktop's patience. The fix was not in the site — it was in the test: capture console errors _before_ waiting for `load`, and treat a `goto` timeout as "still cooking," not "failed." That single change turned a frustrating loop of false negatives into a real signal: when the console showed `Failed to resolve module specifier "three"`, I had found a genuine bug (a malformed import map), not a slow machine.
 
 The meta-lesson: **on weak hardware, your debugging tools lie about causality.** Slow ≠ broken. The discipline is to separate "the machine is thinking" from "the code is wrong," and only act on the latter.
 

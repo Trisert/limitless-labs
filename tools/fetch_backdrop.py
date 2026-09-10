@@ -1,61 +1,111 @@
 #!/usr/bin/env python3
-"""Fetch (or regenerate) the original AI-painted hero backdrop.
+"""Fetch the original hero painting and export it at hero resolution.
 
-The artwork is an original illustration generated with a free,
-no-key provider (Pollinations.ai, model=flux) from the prompt below.
-It is NOT the reference site's artwork: prompt, seed and composition
-targets are ours, tuned so the painted river/sky fit this repo's
-Canvas 2D overlay anchors (water shimmer band, robot perch, copy zone).
+Artwork is generated with the free, keyless Pollinations endpoint (model=flux).
+The anonymous tier returns 1024x576 regardless of the requested size, so the
+export pipeline does the resolution work explicitly:
 
-Reproducible: same prompt + seed returns the same bytes from the
-provider; the file is then upscaled to the scene's logical size
-(1672x941) with LANCZOS and saved as quality-80 JPEG.
+  1024x576 source -> LANCZOS to 2048x1152 -> unsharp mask -> fine canvas grain
+  -> JPEG q88
 
-Usage:  python3 tools/fetch_backdrop.py
-Output: public/art/backdrop-ai.jpg
+2048 wide means the browser always *downscales* the artwork for the hero (even
+at devicePixelRatio 2 on a 1024px-wide viewport), which is what keeps it from
+looking soft. All the crisp detail in the scene (desk, laptop, papers, arm,
+foliage, grass) is drawn as vector work in src/scripts/hero-scene.mjs, not
+baked into this image.
+
+Usage:  python3 tools/fetch_backdrop.py [seed]
 """
 from __future__ import annotations
 
+import random
 import sys
 import urllib.parse
 import urllib.request
 from pathlib import Path
 
+from PIL import Image, ImageDraw, ImageFilter
+
 PROMPT = (
-    "Painterly storybook matte-painting landscape, wide 16:9: luminous open "
-    "morning sky occupying the left two thirds, almost empty for text overlay, "
-    "rolling emerald hills, a winding river crossing the lower third from the "
-    "bottom-left corner to the right edge, dewy meadow foreground with "
-    "wildflowers, a leafy tree branch framing only the top-right corner, small "
-    "warm sun glow in the upper right, distant misty blue hills, soft visible "
-    "brush texture, tranquil greens and sky blues with warm golden accents, no "
-    "buildings, no people, no robots, no animals, no text, no watermark"
+    "Storybook matte painting landscape, wide 16:9, bright high-key daylight: "
+    "luminous pale blue sky with soft white clouds filling the left two thirds, "
+    "low sunlit green rolling hills on the horizon, a sparkling narrow stream "
+    "winding across the lower left toward the centre, lush green meadow with "
+    "wildflowers in the foreground, a big leafy tree canopy framing the top "
+    "right corner, distant hazy blue mountains, airy pastel palette of sky "
+    "blue mint green warm sand and soft gold, soft visible brushwork, no desk, "
+    "no furniture, no buildings, no people, no robots, no animals, no text, "
+    "no watermark"
 )
-SEED = 3701
-WIDTH, HEIGHT = 1672, 941
+SEED = 6101
+EXPORT = (2048, 1152)
 OUT = Path(__file__).resolve().parents[1] / "public" / "art" / "backdrop-ai.jpg"
 
 
-def main() -> None:
-    try:
-        from PIL import Image
-    except ImportError:
-        print("Pillow is required: pip install pillow", file=sys.stderr)
-        raise SystemExit(1)
+def fetch(seed: int) -> bytes:
     url = (
-        "https://image.pollinations.ai/prompt/" + urllib.parse.quote(PROMPT)
-        + f"?width=1536&height=864&nologo=true&model=flux&seed={SEED}"
+        "https://image.pollinations.ai/prompt/"
+        + urllib.parse.quote(PROMPT)
+        + f"?width=1024&height=576&nologo=true&model=flux&seed={seed}"
     )
-    print("fetching:", url[:120], "...")
-    with urllib.request.urlopen(url, timeout=300) as response:
-        raw = response.read()
+    print(f"fetching seed {seed} …")
+    request = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+            "Accept": "image/jpeg,image/*;q=0.8",
+        },
+    )
+    with urllib.request.urlopen(request, timeout=280) as response:
+        return response.read()
+
+
+def canvas_grain(image: Image.Image, strength: int = 5) -> Image.Image:
+    """Paint texture: fine deterministic noise, so it reads as a painting
+    rather than a soft photo when the browser scales it."""
+    rng = random.Random(97)
+    small = Image.new("L", (image.width // 6, image.height // 6))
+    pixels = small.load()
+    assert pixels is not None
+    for y in range(small.height):
+        for x in range(small.width):
+            pixels[x, y] = rng.randrange(256)
+    noise = small.resize(image.size, Image.Resampling.BILINEAR)
+    layer = Image.new("RGBA", image.size, (255, 255, 255, 0))
+    mask = noise.point(lambda value: strength if value > 132 else 0)
+    layer.putalpha(mask)
+    return Image.alpha_composite(image.convert("RGBA"), layer).convert("RGB")
+
+
+def sharpen(image: Image.Image) -> Image.Image:
+    """Detail pass: unsharp edges plus a true high-pass add on luminance, which
+    is what gives a 1k-source painting some bite once the browser scales it."""
+    import numpy as np
+
+    edges = image.filter(ImageFilter.UnsharpMask(radius=1.2, percent=120, threshold=2))
+    blurred = image.filter(ImageFilter.GaussianBlur(2.2))
+    base = np.asarray(image, dtype=np.float32)
+    low = np.asarray(blurred, dtype=np.float32)
+    detail = np.clip(base + (base - low) * 0.7, 0, 255)
+    sharpened = np.asarray(edges, dtype=np.float32) * 0.55 + detail * 0.45
+    return Image.fromarray(np.clip(sharpened, 0, 255).astype(np.uint8), "RGB")
+
+
+def main() -> None:
+    seed = int(sys.argv[1]) if len(sys.argv) > 1 else SEED
+    raw = fetch(seed)
     tmp = OUT.with_suffix(".fetch.tmp")
     tmp.write_bytes(raw)
-    with Image.open(tmp) as image:
-        art = image.convert("RGB").resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
-        art.save(OUT, "JPEG", quality=80, optimize=True, progressive=True)
+    with Image.open(tmp) as source:
+        print(f"source: {source.size}")
+        art = source.convert("RGB").resize(EXPORT, Image.Resampling.LANCZOS)
+    art = art.filter(ImageFilter.UnsharpMask(radius=2.0, percent=80, threshold=3))
+    art = sharpen(art)
+    art = canvas_grain(art)
+    art.save(OUT, "JPEG", quality=88, optimize=True, progressive=True)
     tmp.unlink()
-    print("wrote:", OUT, OUT.stat().st_size, "bytes")
+    print(f"wrote {OUT} ({OUT.stat().st_size} bytes, {art.size[0]}x{art.size[1]})")
 
 
 if __name__ == "__main__":

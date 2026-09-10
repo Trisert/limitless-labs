@@ -15,8 +15,9 @@ test("homepage uses Nicola content and keeps the reference structure", () => {
 test("hero scene is a layered illustrated diorama with a poster fallback", () => {
   assert.match(scene, /getContext\("2d"\)/);
   assert.match(scene, /hero\.dataset\.sceneBackdrop/);
-  assert.match(scene, /hero\.dataset\.sceneRobot/);
   assert.match(scene, /prefers-reduced-motion/);
+  assert.match(scene, /drawMist|drawSunBloom|drawSparkles/);
   assert.match(homepage, /class="landscape"/);
   assert.match(homepage, /class="scene-poster"|id="scene-poster"/);
+  assert.match(homepage, /scene-poster\.jpg/);
 });
