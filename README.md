@@ -4,7 +4,7 @@ Personal portfolio for Nicola Destro: aerospace software, local AI systems, and 
 
 ## Stack
 
-- Astro static output with an original painted hero and a Canvas 2D motion layer (drifting mist, sun bloom, cloud shadows, stream sparkle, canopy wind light, and soft pixel displacement across the painted canopy/sky/water).
+- Astro static output with an original painted hero and a Canvas 2D motion layer (drifting mist, sun bloom, cloud shadows, stream sparkle, canopy wind light, and a seamless low-amplitude camera drift across the complete painting).
 - The hero painting is generated with the free, keyless Pollinations endpoint and exported at 2048px by `tools/fetch_backdrop.py`; the no-JS poster is rendered from the live scene by `tools/make_poster.py`. Both assets live in `public/art/`.
 - Only one raster ships in the hero (the painting). Everything animated on top is vector or gradient work drawn at device resolution, so it stays sharp on any display.
 - Markdown posts in `src/content/posts/` rendered to `/writing/<slug>.html`.

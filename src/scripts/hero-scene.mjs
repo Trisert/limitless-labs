@@ -113,45 +113,15 @@ if (canvas && hero && landscape) {
     }));
   })();
 
-  // Regions of the painting that are *warped* while rendering, the way the
-  // reference deforms its own layers: canopy sway, sky drift and flowing water.
-  // Amplitude tapers to zero at each region's border, so the displaced tiles
-  // always blend back into the untouched painting with no visible seam.
-  const WARP = [
-    {
-      x0: 0.44,
-      y0: 0,
-      x1: 1,
-      y1: 0.56,
-      ampX: 9,
-      ampY: 3,
-      speed: 0.42,
-      freq: 0.014,
-      seed: 1.7,
-    },
-    {
-      x0: 0,
-      y0: 0,
-      x1: 1,
-      y1: 0.33,
-      ampX: 11,
-      ampY: 1.6,
-      speed: 0.15,
-      freq: 0.004,
-      seed: 0.4,
-    },
-    {
-      x0: 0.12,
-      y0: 0.5,
-      x1: 0.54,
-      y1: 0.74,
-      ampX: 6,
-      ampY: 3.5,
-      speed: 0.85,
-      freq: 0.05,
-      seed: 3.1,
-    },
-  ];
+  // Background motion uses a slow camera drift over the complete painting. This
+  // keeps every object, edge and shadow coherent; the detail layers below add
+  // the local motion (mist, water sparkle and leaves) without tile artifacts.
+  const BACKDROP_MOTION = {
+    x: 14,
+    y: 4,
+    zoom: 0.022,
+    speed: 0.16,
+  };
 
   const MIST_BANDS = [
     {
@@ -343,62 +313,30 @@ if (canvas && hero && landscape) {
 
   /* ---------------------------------------------------------------- layers */
 
-  // Tiled displacement of the painting's own pixels. Tile size is chosen per
-  // viewport so phones do less work; tiles overlap by a pixel to hide the seams
-  // between neighbours that move by slightly different amounts.
-  function drawWarpedPainting(seconds) {
+  // Move the complete painted background like a slow parallax camera. Because
+  // the whole raster is transformed as one object, no seams or duplicated
+  // fragments can appear at the canopy, water or desk boundaries.
+  function drawAnimatedBackdrop(seconds) {
     if (!images.backdrop) return;
-    const image = images.backdrop;
-    const tile = viewport.width < 700 ? 46 : 30;
-    for (const region of WARP) {
-      const x0 = region.x0 * LOGICAL.width;
-      const y0 = region.y0 * LOGICAL.height;
-      const x1 = region.x1 * LOGICAL.width;
-      const y1 = region.y1 * LOGICAL.height;
-      const spanX = (x1 - x0) * 0.34;
-      const spanY = (y1 - y0) * 0.34;
-      for (let y = y0; y < y1; y += tile) {
-        for (let x = x0; x < x1; x += tile) {
-          const cx = x + tile / 2;
-          const cy = y + tile / 2;
-          const weight = Math.min(
-            1,
-            Math.max(
-              0,
-              Math.min(
-                (cx - x0) / spanX,
-                (x1 - cx) / spanX,
-                (cy - y0) / spanY,
-                (y1 - cy) / spanY,
-              ),
-            ),
-          );
-          if (weight < 0.08) continue;
-          const phase =
-            seconds * region.speed +
-            cx * region.freq +
-            cy * region.freq * 0.6 +
-            region.seed;
-          const dx = region.ampX * weight * Math.sin(phase);
-          const dy = region.ampY * weight * Math.sin(phase * 0.7 + 1.3);
-          const sourceX = (x / LOGICAL.width) * image.width;
-          const sourceY = (y / LOGICAL.height) * image.height;
-          const sourceW = (tile / LOGICAL.width) * image.width;
-          const sourceH = (tile / LOGICAL.height) * image.height;
-          context.drawImage(
-            image,
-            sourceX,
-            sourceY,
-            sourceW,
-            sourceH,
-            x + dx,
-            y + dy,
-            tile + 1.4,
-            tile + 1.4,
-          );
-        }
-      }
-    }
+    const zoom =
+      1 +
+      BACKDROP_MOTION.zoom +
+      Math.sin(seconds * BACKDROP_MOTION.speed * 0.7) * 0.003;
+    const x = Math.sin(seconds * BACKDROP_MOTION.speed) * BACKDROP_MOTION.x;
+    const y =
+      Math.sin(seconds * BACKDROP_MOTION.speed * 0.63 + 0.8) *
+      BACKDROP_MOTION.y;
+    context.save();
+    context.translate(LOGICAL.width / 2 + x, LOGICAL.height / 2 + y);
+    context.scale(zoom, zoom);
+    context.drawImage(
+      images.backdrop,
+      -LOGICAL.width / 2,
+      -LOGICAL.height / 2,
+      LOGICAL.width,
+      LOGICAL.height,
+    );
+    context.restore();
   }
 
   function drawMist(time) {
@@ -823,7 +761,7 @@ if (canvas && hero && landscape) {
   /* ------------------------------------------------------------- lifecycle */
 
   let images = null;
-  let frame = 0;
+  let timer = 0;
   let visible = true;
   let last = 0;
   let time = 0;
@@ -873,8 +811,7 @@ if (canvas && hero && landscape) {
     context.imageSmoothingEnabled = true;
     context.imageSmoothingQuality = "high";
 
-    context.drawImage(images.backdrop, 0, 0, LOGICAL.width, LOGICAL.height);
-    drawWarpedPainting(seconds);
+    drawAnimatedBackdrop(seconds);
     context.save();
     context.translate(pointer * 8, 0);
     drawMist(seconds);
@@ -894,10 +831,10 @@ if (canvas && hero && landscape) {
     if (fitViewport()) render(time);
   }
 
-  function tick(now) {
-    frame = 0;
-    if (failed) return;
-    if (!visible || document.hidden || reducedMotion.matches) return;
+  function tick() {
+    timer = 0;
+    if (failed || !visible || document.hidden || reducedMotion.matches) return;
+    const now = performance.now();
     if (!last) last = now;
     if (now - last >= 1000 / 30) {
       time += Math.min((now - last) / 1000, 0.12);
@@ -905,14 +842,17 @@ if (canvas && hero && landscape) {
       pointer += (pointerTarget - pointer) * 0.04;
       render(time);
     }
-    frame = requestAnimationFrame(tick);
+    // Use a timer rather than RAF: some Chromium/WebView hosts throttle or
+    // suspend RAF despite a visible canvas, leaving the background frozen.
+    timer = window.setTimeout(tick, 1000 / 30);
   }
 
   function resume() {
-    cancelAnimationFrame(frame);
-    last = 0;
+    window.clearTimeout(timer);
+    timer = 0;
+    last = performance.now();
     if (!failed && !reducedMotion.matches && visible && !document.hidden) {
-      frame = requestAnimationFrame(tick);
+      timer = window.setTimeout(tick, 0);
     } else if (!failed) {
       render(time);
     }
@@ -921,7 +861,8 @@ if (canvas && hero && landscape) {
   function fail(error) {
     console.warn("Illustrated scene disabled:", error);
     failed = true;
-    cancelAnimationFrame(frame);
+    window.clearTimeout(timer);
+    timer = 0;
     canvas.remove();
     loader?.remove();
   }
@@ -948,9 +889,13 @@ if (canvas && hero && landscape) {
       // Deterministic frame hook: ?frame=<seconds> paints one static frame at
       // that time instead of animating. It is what the poster renderer and the
       // visual QA pass use, so both see exactly the same pixels.
-      const requested = Number(
-        new URLSearchParams(window.location.search).get("frame"),
+      const frameParam = new URLSearchParams(window.location.search).get(
+        "frame",
       );
+      const requested =
+        frameParam === null || frameParam.trim() === ""
+          ? Number.NaN
+          : Number(frameParam);
       if (Number.isFinite(requested) && requested >= 0) {
         time = requested;
         render(time);
