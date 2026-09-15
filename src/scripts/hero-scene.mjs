@@ -113,6 +113,46 @@ if (canvas && hero && landscape) {
     }));
   })();
 
+  // Regions of the painting that are *warped* while rendering, the way the
+  // reference deforms its own layers: canopy sway, sky drift and flowing water.
+  // Amplitude tapers to zero at each region's border, so the displaced tiles
+  // always blend back into the untouched painting with no visible seam.
+  const WARP = [
+    {
+      x0: 0.44,
+      y0: 0,
+      x1: 1,
+      y1: 0.56,
+      ampX: 9,
+      ampY: 3,
+      speed: 0.42,
+      freq: 0.014,
+      seed: 1.7,
+    },
+    {
+      x0: 0,
+      y0: 0,
+      x1: 1,
+      y1: 0.33,
+      ampX: 11,
+      ampY: 1.6,
+      speed: 0.15,
+      freq: 0.004,
+      seed: 0.4,
+    },
+    {
+      x0: 0.12,
+      y0: 0.5,
+      x1: 0.54,
+      y1: 0.74,
+      ampX: 6,
+      ampY: 3.5,
+      speed: 0.85,
+      freq: 0.05,
+      seed: 3.1,
+    },
+  ];
+
   const MIST_BANDS = [
     {
       y: 0.1,
@@ -302,6 +342,64 @@ if (canvas && hero && landscape) {
   }
 
   /* ---------------------------------------------------------------- layers */
+
+  // Tiled displacement of the painting's own pixels. Tile size is chosen per
+  // viewport so phones do less work; tiles overlap by a pixel to hide the seams
+  // between neighbours that move by slightly different amounts.
+  function drawWarpedPainting(seconds) {
+    if (!images.backdrop) return;
+    const image = images.backdrop;
+    const tile = viewport.width < 700 ? 46 : 30;
+    for (const region of WARP) {
+      const x0 = region.x0 * LOGICAL.width;
+      const y0 = region.y0 * LOGICAL.height;
+      const x1 = region.x1 * LOGICAL.width;
+      const y1 = region.y1 * LOGICAL.height;
+      const spanX = (x1 - x0) * 0.34;
+      const spanY = (y1 - y0) * 0.34;
+      for (let y = y0; y < y1; y += tile) {
+        for (let x = x0; x < x1; x += tile) {
+          const cx = x + tile / 2;
+          const cy = y + tile / 2;
+          const weight = Math.min(
+            1,
+            Math.max(
+              0,
+              Math.min(
+                (cx - x0) / spanX,
+                (x1 - cx) / spanX,
+                (cy - y0) / spanY,
+                (y1 - cy) / spanY,
+              ),
+            ),
+          );
+          if (weight < 0.08) continue;
+          const phase =
+            seconds * region.speed +
+            cx * region.freq +
+            cy * region.freq * 0.6 +
+            region.seed;
+          const dx = region.ampX * weight * Math.sin(phase);
+          const dy = region.ampY * weight * Math.sin(phase * 0.7 + 1.3);
+          const sourceX = (x / LOGICAL.width) * image.width;
+          const sourceY = (y / LOGICAL.height) * image.height;
+          const sourceW = (tile / LOGICAL.width) * image.width;
+          const sourceH = (tile / LOGICAL.height) * image.height;
+          context.drawImage(
+            image,
+            sourceX,
+            sourceY,
+            sourceW,
+            sourceH,
+            x + dx,
+            y + dy,
+            tile + 1.4,
+            tile + 1.4,
+          );
+        }
+      }
+    }
+  }
 
   function drawMist(time) {
     if (!images.mist) return;
@@ -776,6 +874,7 @@ if (canvas && hero && landscape) {
     context.imageSmoothingQuality = "high";
 
     context.drawImage(images.backdrop, 0, 0, LOGICAL.width, LOGICAL.height);
+    drawWarpedPainting(seconds);
     context.save();
     context.translate(pointer * 8, 0);
     drawMist(seconds);
