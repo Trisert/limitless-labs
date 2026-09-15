@@ -262,14 +262,15 @@ button:focus-visible {
   bottom: 1.5rem;
   display: flex;
   gap: 1.25rem;
-  color: rgb(242 255 240 / 92%);
+  color: rgb(242 255 240 / 94%);
   font-family: var(--font-mono);
   font-size: 0.7rem;
+  font-weight: 500;
   letter-spacing: 0.08em;
   padding: 0.5rem 0.75rem;
   border-radius: 4px;
-  background: rgb(6 32 39 / 34%);
-  backdrop-filter: blur(2px);
+  background: rgb(6 32 39 / 55%);
+  backdrop-filter: blur(3px);
 }
 .scene-loader {
   position: absolute;
