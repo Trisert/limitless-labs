@@ -198,13 +198,13 @@ button:focus-visible {
   z-index: 2;
   pointer-events: none;
   background:
-    linear-gradient(90deg, #062f3a8c 0%, #05303b38 52%, transparent 78%),
+    linear-gradient(90deg, #062f3aab 0%, #05303b4d 50%, transparent 76%),
     linear-gradient(
       0deg,
-      #061f28b8 0%,
+      #061f28c4 0%,
       transparent 26%,
-      transparent 76%,
-      #12384828 100%
+      transparent 74%,
+      #12384830 100%
     );
 }
 .hero-copy .eyebrow,

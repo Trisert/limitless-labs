@@ -27,7 +27,7 @@ DIST = REPO / "dist"
 POSTER = REPO / "public" / "art" / "scene-poster.jpg"
 BASE = "/limitless-labs/"
 LOGICAL = (1672, 941)
-BUDGET_MS = 11000
+BUDGET_MS = 6000
 
 PAGE = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>poster</title>
@@ -47,15 +47,24 @@ PAGE = """<!doctype html>
 
 
 def build_page(script: str) -> str:
-    return PAGE.replace("__BACKDROP__", f"{BASE}art/backdrop-ai.jpg").replace(
+    return PAGE.replace("__BACKDROP__", f"{BASE}art/backdrop.jpg").replace(
         "__SCRIPT__", script
     )
+
+
+def find_browser() -> str:
+    for name in ("google-chrome", "chromium", "chromium-browser", "chrome"):
+        found = shutil.which(name)
+        if found:
+            return found
+    raise SystemExit("no Chromium/Chrome binary found on PATH")
 
 
 def main() -> None:
     if not (DIST / "index.html").is_file():
         raise SystemExit("dist/ not found — run `npm run build` first")
 
+    browser = find_browser()
     index = (DIST / "index.html").read_text(encoding="utf-8")
     match = re.search(r'src="([^"]*/_astro/[^"]+\.js)"', index)
     if not match:
@@ -81,9 +90,11 @@ def main() -> None:
     thread.start()
 
     shot = work / "poster.png"
-    url = f"http://127.0.0.1:{port}{BASE}poster.html"
+    # Fixed frame: the poster shows the scene mid-session (screen awake, part of
+    # the writing drawn) and is byte-reproducible across runs.
+    url = f"http://127.0.0.1:{port}{BASE}poster.html?frame=9"
     command = [
-        "google-chrome",
+        browser,
         "--headless",
         "--disable-gpu",
         "--no-sandbox",
