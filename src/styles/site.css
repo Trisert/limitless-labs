@@ -185,6 +185,9 @@ button:focus-visible {
   overflow: hidden;
   background: #247fa8;
 }
+.hero.scene-ready .landscape {
+  z-index: 2;
+}
 .landscape img {
   object-fit: cover;
   object-position: right center;
@@ -193,9 +196,16 @@ button:focus-visible {
   z-index: 1;
   display: block;
   pointer-events: none;
+  opacity: 0;
+}
+.hero.scene-ready .landscape canvas {
+  opacity: 1;
+}
+.hero.scene-fallback .landscape canvas {
+  display: none;
 }
 .hero-shade {
-  z-index: 2;
+  z-index: 1;
   pointer-events: none;
   background:
     linear-gradient(90deg, #062f3aab 0%, #05303b4d 50%, transparent 76%),
@@ -208,8 +218,7 @@ button:focus-visible {
     );
 }
 .hero-copy .eyebrow,
-.hero-description,
-.hero-readout {
+.hero-description {
   text-shadow: 0 1px 12px rgb(6 34 42 / 62%);
 }
 .hero-copy {
@@ -249,28 +258,13 @@ button:focus-visible {
   background: #f5f8ec;
   border-radius: 5px;
   box-shadow: 0 3px rgb(5 45 52 / 14%);
-  transition: transform 0.2s;
+  transition: transform 0.2s ease-out;
 }
-.hero-cta:hover {
-  color: #203c32;
-  transform: translateY(-3px);
-}
-.hero-readout {
-  position: absolute;
-  z-index: 3;
-  right: 5%;
-  bottom: 1.5rem;
-  display: flex;
-  gap: 1.25rem;
-  color: rgb(242 255 240 / 94%);
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  padding: 0.5rem 0.75rem;
-  border-radius: 4px;
-  background: rgb(6 32 39 / 55%);
-  backdrop-filter: blur(3px);
+@media (hover: hover) and (pointer: fine) {
+  .hero-cta:hover {
+    color: #203c32;
+    transform: translateY(-3px);
+  }
 }
 .scene-loader {
   position: absolute;
@@ -287,7 +281,9 @@ button:focus-visible {
   border: 1px solid rgb(255 255 255 / 20%);
   border-radius: 999px;
   pointer-events: none;
-  animation: dismiss-loader 0s 6s forwards;
+}
+.scene-loader[hidden] {
+  display: none;
 }
 .scene-loader-dot {
   width: 0.8rem;
@@ -300,11 +296,6 @@ button:focus-visible {
 @keyframes loader-spin {
   to {
     transform: rotate(360deg);
-  }
-}
-@keyframes dismiss-loader {
-  to {
-    visibility: hidden;
   }
 }
 
@@ -727,16 +718,8 @@ body:not(.portfolio) > footer {
       #052e3dad
     );
   }
-  .hero-readout {
-    right: 5%;
-    bottom: 1rem;
-    display: block;
-    font-size: 0.6rem;
-    line-height: 1.8;
-    text-align: right;
-  }
-  .hero-readout span {
-    display: block;
+  .landscape img {
+    object-position: 58% center;
   }
   .scene-loader {
     right: 1rem;
