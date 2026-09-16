@@ -12,22 +12,21 @@ test("homepage uses Nicola content and keeps the reference structure", () => {
   assert.doesNotMatch(homepage, /Varun|Avici|fixmahbug|varunlohade/);
 });
 
-test("hero scene is a transparent atmospheric enhancement over one canonical painting", () => {
+test("hero scene animates source-anchored layers from one canonical painting", () => {
   assert.match(scene, /getContext\("2d"\)/);
-  assert.match(scene, /poster\?\.decode/);
+  assert.match(scene, /waitForPoster/);
   assert.match(scene, /prefers-reduced-motion/);
-  assert.match(scene, /drawAmbientLight/);
-  assert.match(scene, /drawWaterGlints/);
-  assert.match(scene, /clearCanvas/);
-  assert.match(scene, /getComputedStyle\(poster\)\.objectPosition/);
+  assert.match(scene, /createSourceLayer/);
+  assert.match(scene, /drawCanopyMotion/);
+  assert.match(scene, /drawWaterMotion/);
+  assert.match(scene, /drawRobotCycle/);
   assert.match(scene, /requestAnimationFrame/);
+  assert.match(scene, /getComputedStyle\(poster\)\.objectPosition/);
   assert.match(scene, /hero\.classList\.add\("scene-ready"\)/);
   assert.match(scene, /requested !== null && Number\.isFinite\(requested\)/);
   assert.match(scene, /URLSearchParams\(window\.location\.search\)/);
-  assert.doesNotMatch(
-    scene,
-    /drawImage|drawBackdrop|drawLeaves|drawScreenOverlay|drawInk|drawMist/,
-  );
+  assert.match(scene, /sourceContext\.drawImage\(poster/);
+  assert.doesNotMatch(scene, /drawAmbientLight|drawWaterGlints/);
   assert.match(homepage, /class="landscape"/);
   assert.match(homepage, /class="scene-poster"|id="scene-poster"/);
   assert.match(homepage, /art\/backdrop\.jpg/);

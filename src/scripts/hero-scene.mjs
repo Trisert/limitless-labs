@@ -1,35 +1,33 @@
-// Limitless Labs — a quiet, painted hero scene.
+// Limitless Labs — a source-anchored animated painting.
 //
-// The artwork stays still. Motion is reserved for two things that belong to the
-// landscape: a slow change in daylight and short glints moving along the water.
-// Keeping the raster intact avoids seams, drifting edges and fake UI layered over
-// objects that were never designed to move.
+// The poster remains the canonical artwork. The canvas samples that same image
+// into a few transparent layers, then gives the canopy, water and robot's work
+// cycle their own motion. Nothing is placed in viewport coordinates, so the
+// animation stays attached when object-fit crops the painting.
 
 const canvas = document.getElementById("orbitCanvas");
 const hero = document.getElementById("hero");
 const landscape = hero?.querySelector(".landscape");
-const poster = landscape?.querySelector(".scene-poster");
+const poster = landscape?.querySelector(".scene-poster, #scene-poster");
 const loader = hero?.querySelector(".scene-loader");
 
 if (canvas && hero && landscape) {
   const context = canvas.getContext("2d");
+  const sourceCanvas = document.createElement("canvas");
+  const sourceContext = sourceCanvas.getContext("2d", {
+    willReadFrequently: true,
+  });
   const LOGICAL = { width: 1672, height: 941 };
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   const viewport = { width: 0, height: 0, dpr: 1, scale: 1, left: 0, top: 0 };
-  const waterRows = [
-    { x0: 0.16, x1: 0.52, y: 0.576, phase: 0.05, speed: 0.13 },
-    { x0: 0.17, x1: 0.5, y: 0.616, phase: 0.48, speed: 0.1 },
-    { x0: 0.19, x1: 0.51, y: 0.654, phase: 0.82, speed: 0.16 },
-    {
-      x: 0.536,
-      y0: 0.565,
-      y1: 0.704,
-      phase: 0.28,
-      speed: 0.08,
-      vertical: true,
-    },
-  ];
+  const PERIOD = 18;
+  const bounds = {
+    canopy: { x: 380, y: 0, width: 1292, height: 490 },
+    water: { x: 0, y: 565, width: 1080, height: 310 },
+  };
 
+  let canopyLayer;
+  let waterLayer;
   let frameId = 0;
   let lastPaint = 0;
   let visible = true;
@@ -39,15 +37,18 @@ if (canvas && hero && landscape) {
 
   const clamp = (value, min = 0, max = 1) =>
     value < min ? min : value > max ? max : value;
+  const ease = (value) => {
+    const t = clamp(value);
+    return t * t * (3 - 2 * t);
+  };
+  const lerp = (a, b, amount) => a + (b - a) * amount;
 
   function positionRatio(token, available, fallback) {
     const value = token?.toLowerCase();
     if (value === "left" || value === "top") return 0;
     if (value === "center") return 0.5;
     if (value === "right" || value === "bottom") return 1;
-    if (value?.endsWith("%")) {
-      return clamp(Number.parseFloat(value) / 100);
-    }
+    if (value?.endsWith("%")) return clamp(Number.parseFloat(value) / 100);
     const pixels = Number.parseFloat(value);
     return Number.isFinite(pixels) && available
       ? clamp(pixels / available)
@@ -105,138 +106,233 @@ if (canvas && hero && landscape) {
     context.imageSmoothingQuality = "high";
   }
 
-  function drawAmbientLight(seconds) {
-    const pulse = 0.5 + Math.sin(seconds * 0.18 - 0.6) * 0.5;
-    const drift = Math.sin(seconds * 0.07) * 34;
-    const x = LOGICAL.width * 0.18 + drift;
-    const y = LOGICAL.height * 0.16;
-    const radius = LOGICAL.width * 0.43;
-
-    context.save();
-    context.globalCompositeOperation = "screen";
-    const glow = context.createRadialGradient(x, y, 0, x, y, radius);
-    glow.addColorStop(0, `rgba(255, 245, 196, ${0.045 + pulse * 0.035})`);
-    glow.addColorStop(0.48, `rgba(255, 238, 178, ${0.018 + pulse * 0.012})`);
-    glow.addColorStop(1, "rgba(255, 238, 178, 0)");
-    context.fillStyle = glow;
-    context.fillRect(0, 0, LOGICAL.width, LOGICAL.height);
-
-    // A second, cooler pass makes the canopy breathe without drawing a visible
-    // geometric mask across the painting.
-    const canopy = context.createRadialGradient(
-      LOGICAL.width * 0.79,
-      LOGICAL.height * 0.18,
+  function createSourceLayer(name, region, alphaForPixel) {
+    const layer = document.createElement("canvas");
+    layer.width = region.width;
+    layer.height = region.height;
+    layer.dataset.layer = name;
+    const layerContext = layer.getContext("2d", { willReadFrequently: true });
+    layerContext.drawImage(
+      sourceCanvas,
+      region.x,
+      region.y,
+      region.width,
+      region.height,
       0,
-      LOGICAL.width * 0.79,
-      LOGICAL.height * 0.18,
-      LOGICAL.width * 0.52,
-    );
-    canopy.addColorStop(0, `rgba(211, 245, 196, ${0.018 + pulse * 0.018})`);
-    canopy.addColorStop(1, "rgba(211, 245, 196, 0)");
-    context.fillStyle = canopy;
-    context.fillRect(0, 0, LOGICAL.width, LOGICAL.height * 0.74);
-
-    // A broad, slow shaft of light crosses only the painted canopy. It gives the
-    // scene a readable beat without moving the tree, typography or workbench.
-    const sweep = (seconds * 0.035) % 1;
-    const beamX = LOGICAL.width * (0.42 + sweep * 0.64);
-    context.save();
-    context.beginPath();
-    context.moveTo(LOGICAL.width * 0.34, 0);
-    context.lineTo(LOGICAL.width, 0);
-    context.lineTo(LOGICAL.width, LOGICAL.height * 0.6);
-    context.lineTo(LOGICAL.width * 0.77, LOGICAL.height * 0.5);
-    context.lineTo(LOGICAL.width * 0.61, LOGICAL.height * 0.38);
-    context.lineTo(LOGICAL.width * 0.47, LOGICAL.height * 0.34);
-    context.closePath();
-    context.clip();
-    const beam = context.createLinearGradient(
-      beamX - LOGICAL.width * 0.16,
       0,
-      beamX + LOGICAL.width * 0.16,
-      LOGICAL.height * 0.56,
+      region.width,
+      region.height,
     );
-    beam.addColorStop(0, "rgba(255, 244, 190, 0)");
-    beam.addColorStop(0.5, `rgba(255, 244, 190, ${0.1 + pulse * 0.06})`);
-    beam.addColorStop(1, "rgba(255, 244, 190, 0)");
-    context.fillStyle = beam;
-    context.fillRect(0, 0, LOGICAL.width, LOGICAL.height * 0.66);
-    context.restore();
+    const pixels = layerContext.getImageData(0, 0, region.width, region.height);
+    for (let index = 0; index < pixels.data.length; index += 4) {
+      const red = pixels.data[index];
+      const green = pixels.data[index + 1];
+      const blue = pixels.data[index + 2];
+      pixels.data[index + 3] = Math.round(
+        255 * alphaForPixel(red, green, blue, index / 4, region.width),
+      );
+    }
+    layerContext.putImageData(pixels, 0, 0);
+    return layer;
+  }
+
+  function createSourceLayers() {
+    sourceCanvas.width = LOGICAL.width;
+    sourceCanvas.height = LOGICAL.height;
+    sourceContext.clearRect(0, 0, LOGICAL.width, LOGICAL.height);
+    sourceContext.drawImage(poster, 0, 0, LOGICAL.width, LOGICAL.height);
+
+    canopyLayer = createSourceLayer(
+      "canopy",
+      bounds.canopy,
+      (red, green, blue, index, width) => {
+        const x = index % width;
+        const y = Math.floor(index / width);
+        const greenLead = green - Math.max(red, blue);
+        const saturation =
+          Math.max(red, green, blue) - Math.min(red, green, blue);
+        const edgeFade =
+          clamp((greenLead - 2) / 26) * clamp((saturation - 18) / 88);
+        const topFade = y < 34 ? 0.82 + (y / 34) * 0.18 : 1;
+        const sideFade = x < 36 ? x / 36 : 1;
+        return edgeFade * topFade * sideFade;
+      },
+    );
+
+    waterLayer = createSourceLayer(
+      "water",
+      bounds.water,
+      (red, green, blue, index, width) => {
+        const x = index % width;
+        const y = Math.floor(index / width);
+        const blueLead = blue - red;
+        const coolLead = blue - green;
+        const riverHue =
+          clamp((blueLead + 1) / 34) * clamp((coolLead + 1) / 30);
+        const bankFade =
+          clamp((y - 8) / 22) * clamp((bounds.water.height - y) / 34);
+        const edgeFade = clamp((x + 18) / 60) * clamp((width - x + 18) / 75);
+        return riverHue * bankFade * edgeFade * 0.92;
+      },
+    );
+  }
+
+  function drawCanopyMotion(seconds) {
+    if (!canopyLayer) return;
+    const region = bounds.canopy;
+    context.save();
+    context.globalAlpha = 0.92;
+    const stripHeight = 12;
+    for (let y = 0; y < region.height; y += stripHeight) {
+      const height = Math.min(stripHeight, region.height - y);
+      const depth = y / region.height;
+      const sway =
+        Math.sin(seconds * 0.82 + y * 0.027) * (2.3 + depth * 3.7) +
+        Math.sin(seconds * 0.37 + y * 0.011) * (0.8 + depth * 1.5);
+      context.drawImage(
+        canopyLayer,
+        0,
+        y,
+        region.width,
+        height,
+        region.x + sway,
+        region.y + y,
+        region.width,
+        height,
+      );
+    }
     context.restore();
   }
 
-  function drawWaterGlints(seconds) {
+  function drawWaterMotion(seconds) {
+    if (!waterLayer) return;
+    const region = bounds.water;
+    context.save();
+    context.globalAlpha = 0.94;
+    const stripHeight = 4;
+    for (let y = 0; y < region.height; y += stripHeight) {
+      const height = Math.min(stripHeight, region.height - y);
+      const shift =
+        Math.sin(y * 0.11 + seconds * 2.15) * 3.8 +
+        Math.sin(y * 0.31 - seconds * 1.35) * 1.4;
+      context.drawImage(
+        waterLayer,
+        0,
+        y,
+        region.width,
+        height,
+        region.x + shift,
+        region.y + y,
+        region.width,
+        height,
+      );
+    }
+    context.restore();
+  }
+
+  function robotPose(seconds) {
+    const phase = ((seconds % PERIOD) + PERIOD) % PERIOD;
+    const home = [1328, 750];
+    const paper = [1248, 826];
+    let grip = home;
+    let writing = false;
+    let progress = 0;
+
+    if (phase < 2) {
+      grip = home;
+    } else if (phase < 5) {
+      const amount = ease((phase - 2) / 3);
+      grip = [lerp(home[0], paper[0], amount), lerp(home[1], paper[1], amount)];
+    } else if (phase < 12) {
+      writing = true;
+      progress = ease((phase - 5) / 7);
+      grip = [paper[0] + Math.sin(progress * Math.PI * 4) * 28, paper[1]];
+    } else if (phase < 15) {
+      const amount = ease((phase - 12) / 3);
+      grip = [lerp(paper[0], home[0], amount), lerp(paper[1], home[1], amount)];
+    }
+
+    return { phase, grip, progress, writing };
+  }
+
+  function drawWritingTrace(progress, opacity) {
+    const points = [
+      [1218, 838],
+      [1240, 832],
+      [1261, 840],
+      [1284, 833],
+      [1307, 840],
+    ];
+    const distance = (points.length - 1) * progress;
+    const segment = Math.min(points.length - 2, Math.floor(distance));
+    const fraction = distance - segment;
+
+    context.save();
+    context.globalCompositeOperation = "screen";
+    context.globalAlpha = opacity;
+    context.strokeStyle = "rgba(255, 227, 157, 0.78)";
+    context.lineWidth = 2.2;
+    context.lineCap = "round";
+    context.beginPath();
+    context.moveTo(...points[0]);
+    for (let index = 1; index <= segment; index += 1) {
+      context.lineTo(...points[index]);
+    }
+    const start = points[segment];
+    const end = points[segment + 1];
+    context.lineTo(
+      lerp(start[0], end[0], fraction),
+      lerp(start[1], end[1], fraction),
+    );
+    context.stroke();
+    context.restore();
+  }
+
+  function drawRobotCycle(seconds) {
+    const state = robotPose(seconds);
+    const base = [1532, 874];
+    const elbow = [1453, 616];
+    const pulse = 0.5 + Math.sin(seconds * 3.2) * 0.5;
+
     context.save();
     context.globalCompositeOperation = "screen";
     context.lineCap = "round";
-    context.lineWidth = 2.2;
+    context.lineJoin = "round";
+    context.strokeStyle = `rgba(239, 246, 204, ${0.12 + pulse * 0.1})`;
+    context.lineWidth = 2.4;
     context.beginPath();
-    context.moveTo(LOGICAL.width * 0.08, LOGICAL.height * 0.55);
-    context.bezierCurveTo(
-      LOGICAL.width * 0.2,
-      LOGICAL.height * 0.53,
-      LOGICAL.width * 0.43,
-      LOGICAL.height * 0.56,
-      LOGICAL.width * 0.54,
-      LOGICAL.height * 0.62,
-    );
-    context.bezierCurveTo(
-      LOGICAL.width * 0.59,
-      LOGICAL.height * 0.67,
-      LOGICAL.width * 0.57,
-      LOGICAL.height * 0.74,
-      LOGICAL.width * 0.42,
-      LOGICAL.height * 0.75,
-    );
-    context.bezierCurveTo(
-      LOGICAL.width * 0.25,
-      LOGICAL.height * 0.72,
-      LOGICAL.width * 0.11,
-      LOGICAL.height * 0.66,
-      LOGICAL.width * 0.08,
-      LOGICAL.height * 0.55,
-    );
-    context.closePath();
-    context.clip();
+    context.moveTo(...base);
+    context.lineTo(...elbow);
+    context.lineTo(...state.grip);
+    context.stroke();
 
-    for (const row of waterRows) {
-      const progress = (seconds * row.speed + row.phase) % 1;
-      const length = 0.11;
-      const start = progress * (1 + length) - length;
-      const end = start + length;
-      const from = row.vertical ? row.y0 : row.x0;
-      const to = row.vertical ? row.y1 : row.x1;
-      const head = from + (to - from) * clamp(start);
-      const tail = from + (to - from) * clamp(end);
-      const fade = Math.sin(Math.PI * clamp((progress + 0.12) % 1));
-      const alpha = 0.11 + fade * 0.13;
-
-      context.strokeStyle = `rgba(233, 255, 231, ${alpha})`;
-      context.beginPath();
-      if (row.vertical) {
-        const x = row.x * LOGICAL.width;
-        context.moveTo(x, head * LOGICAL.height);
-        context.lineTo(x, tail * LOGICAL.height);
-      } else {
-        const y = row.y * LOGICAL.height;
-        const startX = head * LOGICAL.width;
-        const endX = tail * LOGICAL.width;
-        const offset = Math.sin(seconds * 0.8 + row.phase) * 1.2;
-        context.moveTo(startX, y + offset);
-        context.lineTo(endX, y + offset);
-      }
-      context.stroke();
-    }
+    const glow = context.createRadialGradient(
+      state.grip[0],
+      state.grip[1],
+      0,
+      state.grip[0],
+      state.grip[1],
+      14,
+    );
+    glow.addColorStop(0, `rgba(255, 223, 125, ${0.4 + pulse * 0.22})`);
+    glow.addColorStop(0.32, `rgba(255, 204, 92, ${0.16 + pulse * 0.1})`);
+    glow.addColorStop(1, "rgba(255, 204, 92, 0)");
+    context.fillStyle = glow;
+    context.beginPath();
+    context.arc(state.grip[0], state.grip[1], 14, 0, Math.PI * 2);
+    context.fill();
     context.restore();
+
+    if (state.writing) drawWritingTrace(state.progress, 0.44 + pulse * 0.18);
   }
 
   function paint(seconds) {
     if (failed || !viewport.width || !viewport.height) return;
     clearCanvas();
-    if (!reducedMotion.matches) {
-      drawAmbientLight(seconds);
-      drawWaterGlints(seconds);
-    }
+    if (reducedMotion.matches) return;
+    drawCanopyMotion(seconds);
+    drawWaterMotion(seconds);
+    drawRobotCycle(seconds);
   }
 
   function stop() {
@@ -290,16 +386,35 @@ if (canvas && hero && landscape) {
     hero.classList.add("scene-fallback");
   }
 
+  function waitForPoster() {
+    if (!poster) return Promise.reject(new Error("Scene poster unavailable"));
+    if (poster.complete && poster.naturalWidth) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const onLoad = () => {
+        cleanup();
+        resolve();
+      };
+      const onError = () => {
+        cleanup();
+        reject(new Error("Scene poster unavailable"));
+      };
+      const cleanup = () => {
+        poster.removeEventListener("load", onLoad);
+        poster.removeEventListener("error", onError);
+      };
+      poster.addEventListener("load", onLoad, { once: true });
+      poster.addEventListener("error", onError, { once: true });
+    });
+  }
+
   async function start() {
     try {
-      if (!context) throw new Error("Canvas 2D unavailable");
+      if (!context || !sourceContext) throw new Error("Canvas 2D unavailable");
       if (!fitViewport()) throw new Error("Scene viewport unavailable");
+      await waitForPoster();
 
-      // The poster is the canonical scene. The canvas is only an enhancement
-      // layer, so decode it before revealing the transparent overlay.
-      if (poster?.decode) await poster.decode().catch(() => {});
+      createSourceLayers();
 
-      // Deterministic frame hook used by poster rendering and visual QA.
       const frameParam = new URLSearchParams(window.location.search).get(
         "frame",
       );
