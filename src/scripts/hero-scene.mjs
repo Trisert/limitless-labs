@@ -894,9 +894,9 @@ if (canvas && hero && landscape) {
       );
       const requested =
         frameParam === null || frameParam.trim() === ""
-          ? Number.NaN
+          ? null
           : Number(frameParam);
-      if (Number.isFinite(requested) && requested >= 0) {
+      if (requested !== null && Number.isFinite(requested) && requested >= 0) {
         time = requested;
         render(time);
         loader?.remove();

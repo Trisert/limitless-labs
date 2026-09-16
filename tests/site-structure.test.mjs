@@ -18,7 +18,7 @@ test("hero scene is a layered illustrated diorama with a poster fallback", () =>
   assert.match(scene, /prefers-reduced-motion/);
   assert.match(scene, /drawMist|drawSunBloom|drawSparkles/);
   assert.match(scene, /drawAnimatedBackdrop/);
-  assert.match(scene, /frameParam === null/);
+  assert.match(scene, /requested !== null && Number\.isFinite\(requested\)/);
   assert.match(scene, /URLSearchParams\(window\.location\.search\)/);
   assert.match(homepage, /class="landscape"/);
   assert.match(homepage, /class="scene-poster"|id="scene-poster"/);
