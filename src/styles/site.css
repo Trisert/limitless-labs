@@ -215,8 +215,7 @@ button:focus-visible {
     );
 }
 .hero-copy .eyebrow,
-.hero-description,
-.hero-readout {
+.hero-description {
   text-shadow: 0 1px 12px rgb(6 34 42 / 62%);
 }
 .hero-copy {
@@ -256,28 +255,13 @@ button:focus-visible {
   background: #f5f8ec;
   border-radius: 5px;
   box-shadow: 0 3px rgb(5 45 52 / 14%);
-  transition: transform 0.2s;
+  transition: transform 0.2s ease-out;
 }
-.hero-cta:hover {
-  color: #203c32;
-  transform: translateY(-3px);
-}
-.hero-readout {
-  position: absolute;
-  z-index: 3;
-  right: 5%;
-  bottom: 1.5rem;
-  display: flex;
-  gap: 1.25rem;
-  color: rgb(242 255 240 / 94%);
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  padding: 0.5rem 0.75rem;
-  border-radius: 4px;
-  background: rgb(6 32 39 / 55%);
-  backdrop-filter: blur(3px);
+@media (hover: hover) and (pointer: fine) {
+  .hero-cta:hover {
+    color: #203c32;
+    transform: translateY(-3px);
+  }
 }
 .scene-loader {
   position: absolute;
@@ -731,16 +715,8 @@ body:not(.portfolio) > footer {
       #052e3dad
     );
   }
-  .hero-readout {
-    right: 5%;
-    bottom: 1rem;
-    display: block;
-    font-size: 0.6rem;
-    line-height: 1.8;
-    text-align: right;
-  }
-  .hero-readout span {
-    display: block;
+  .landscape img {
+    object-position: 58% center;
   }
   .scene-loader {
     right: 1rem;

@@ -12,19 +12,24 @@ test("homepage uses Nicola content and keeps the reference structure", () => {
   assert.doesNotMatch(homepage, /Varun|Avici|fixmahbug|varunlohade/);
 });
 
-test("hero scene is a layered illustrated diorama with a poster fallback", () => {
+test("hero scene is a transparent atmospheric enhancement over one canonical painting", () => {
   assert.match(scene, /getContext\("2d"\)/);
-  assert.match(scene, /hero\.dataset\.sceneBackdrop/);
+  assert.match(scene, /poster\?\.decode/);
   assert.match(scene, /prefers-reduced-motion/);
-  assert.match(scene, /drawBackdrop/);
   assert.match(scene, /drawAmbientLight/);
   assert.match(scene, /drawWaterGlints/);
+  assert.match(scene, /clearCanvas/);
+  assert.match(scene, /getComputedStyle\(poster\)\.objectPosition/);
   assert.match(scene, /requestAnimationFrame/);
   assert.match(scene, /hero\.classList\.add\("scene-ready"\)/);
   assert.match(scene, /requested !== null && Number\.isFinite\(requested\)/);
   assert.match(scene, /URLSearchParams\(window\.location\.search\)/);
-  assert.doesNotMatch(scene, /drawLeaves|drawScreenOverlay|drawInk/);
+  assert.doesNotMatch(
+    scene,
+    /drawBackdrop|drawLeaves|drawScreenOverlay|drawInk|drawMist/,
+  );
   assert.match(homepage, /class="landscape"/);
   assert.match(homepage, /class="scene-poster"|id="scene-poster"/);
-  assert.match(homepage, /scene-poster\.jpg/);
+  assert.match(homepage, /art\/backdrop\.jpg/);
+  assert.doesNotMatch(homepage, /scene-poster\.jpg|hero-readout/);
 });

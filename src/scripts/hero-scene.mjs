@@ -8,6 +8,7 @@
 const canvas = document.getElementById("orbitCanvas");
 const hero = document.getElementById("hero");
 const landscape = hero?.querySelector(".landscape");
+const poster = landscape?.querySelector(".scene-poster");
 const loader = hero?.querySelector(".scene-loader");
 
 if (canvas && hero && landscape) {
@@ -29,7 +30,6 @@ if (canvas && hero && landscape) {
     },
   ];
 
-  let backdrop = null;
   let frameId = 0;
   let lastPaint = 0;
   let visible = true;
@@ -39,6 +39,20 @@ if (canvas && hero && landscape) {
 
   const clamp = (value, min = 0, max = 1) =>
     value < min ? min : value > max ? max : value;
+
+  function positionRatio(token, available, fallback) {
+    const value = token?.toLowerCase();
+    if (value === "left" || value === "top") return 0;
+    if (value === "center") return 0.5;
+    if (value === "right" || value === "bottom") return 1;
+    if (value?.endsWith("%")) {
+      return clamp(Number.parseFloat(value) / 100);
+    }
+    const pixels = Number.parseFloat(value);
+    return Number.isFinite(pixels) && available
+      ? clamp(pixels / available)
+      : fallback;
+  }
 
   function fitViewport() {
     const rect = landscape.getBoundingClientRect();
@@ -51,9 +65,17 @@ if (canvas && hero && landscape) {
       rect.width / LOGICAL.width,
       rect.height / LOGICAL.height,
     );
-    // Match the poster's object-position: right center.
-    viewport.left = LOGICAL.width - rect.width / viewport.scale;
-    viewport.top = (LOGICAL.height - rect.height / viewport.scale) / 2;
+    const visibleWidth = rect.width / viewport.scale;
+    const visibleHeight = rect.height / viewport.scale;
+    const sourceWidth = LOGICAL.width - visibleWidth;
+    const sourceHeight = LOGICAL.height - visibleHeight;
+    const objectPosition = poster
+      ? getComputedStyle(poster).objectPosition.split(/\s+/)
+      : [];
+    viewport.left =
+      sourceWidth * positionRatio(objectPosition[0], sourceWidth, 1);
+    viewport.top =
+      sourceHeight * positionRatio(objectPosition[1], sourceHeight, 0.5);
 
     const width = Math.max(1, Math.round(rect.width * viewport.dpr));
     const height = Math.max(1, Math.round(rect.height * viewport.dpr));
@@ -81,11 +103,6 @@ if (canvas && hero && landscape) {
     beginSceneTransform();
     context.imageSmoothingEnabled = true;
     context.imageSmoothingQuality = "high";
-  }
-
-  function drawBackdrop() {
-    if (!backdrop) return;
-    context.drawImage(backdrop, 0, 0, LOGICAL.width, LOGICAL.height);
   }
 
   function drawAmbientLight(seconds) {
@@ -126,6 +143,34 @@ if (canvas && hero && landscape) {
     context.globalCompositeOperation = "screen";
     context.lineCap = "round";
     context.lineWidth = 1.35;
+    context.beginPath();
+    context.moveTo(LOGICAL.width * 0.08, LOGICAL.height * 0.55);
+    context.bezierCurveTo(
+      LOGICAL.width * 0.2,
+      LOGICAL.height * 0.53,
+      LOGICAL.width * 0.43,
+      LOGICAL.height * 0.56,
+      LOGICAL.width * 0.54,
+      LOGICAL.height * 0.62,
+    );
+    context.bezierCurveTo(
+      LOGICAL.width * 0.59,
+      LOGICAL.height * 0.67,
+      LOGICAL.width * 0.57,
+      LOGICAL.height * 0.74,
+      LOGICAL.width * 0.42,
+      LOGICAL.height * 0.75,
+    );
+    context.bezierCurveTo(
+      LOGICAL.width * 0.25,
+      LOGICAL.height * 0.72,
+      LOGICAL.width * 0.11,
+      LOGICAL.height * 0.66,
+      LOGICAL.width * 0.08,
+      LOGICAL.height * 0.55,
+    );
+    context.closePath();
+    context.clip();
 
     for (const row of waterRows) {
       const progress = (seconds * row.speed + row.phase) % 1;
@@ -159,9 +204,8 @@ if (canvas && hero && landscape) {
   }
 
   function paint(seconds) {
-    if (failed || !backdrop || !viewport.width || !viewport.height) return;
+    if (failed || !viewport.width || !viewport.height) return;
     clearCanvas();
-    drawBackdrop();
     if (!reducedMotion.matches) {
       drawAmbientLight(seconds);
       drawWaterGlints(seconds);
@@ -219,24 +263,14 @@ if (canvas && hero && landscape) {
     hero.classList.add("scene-fallback");
   }
 
-  function loadImage(source) {
-    return new Promise((resolve, reject) => {
-      const image = new Image();
-      image.decoding = "async";
-      image.onload = () => resolve(image);
-      image.onerror = () => reject(new Error(`Could not load ${source}`));
-      image.src = new URL(source, document.baseURI).href;
-    });
-  }
-
   async function start() {
     try {
       if (!context) throw new Error("Canvas 2D unavailable");
-      const source = hero.dataset.sceneBackdrop;
-      if (!source) throw new Error("Scene artwork missing");
-
-      backdrop = await loadImage(source);
       if (!fitViewport()) throw new Error("Scene viewport unavailable");
+
+      // The poster is the canonical scene. The canvas is only an enhancement
+      // layer, so decode it before revealing the transparent overlay.
+      if (poster?.decode) await poster.decode().catch(() => {});
 
       // Deterministic frame hook used by poster rendering and visual QA.
       const frameParam = new URLSearchParams(window.location.search).get(
