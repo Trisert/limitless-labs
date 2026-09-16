@@ -185,6 +185,9 @@ button:focus-visible {
   overflow: hidden;
   background: #247fa8;
 }
+.hero.scene-ready .landscape {
+  z-index: 2;
+}
 .landscape img {
   object-fit: cover;
   object-position: right center;
@@ -202,7 +205,7 @@ button:focus-visible {
   display: none;
 }
 .hero-shade {
-  z-index: 2;
+  z-index: 1;
   pointer-events: none;
   background:
     linear-gradient(90deg, #062f3aab 0%, #05303b4d 50%, transparent 76%),

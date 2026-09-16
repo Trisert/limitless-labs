@@ -20,7 +20,7 @@ if (canvas && hero && landscape) {
   const LOGICAL = { width: 1672, height: 941 };
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   const viewport = { width: 0, height: 0, dpr: 1, scale: 1, left: 0, top: 0 };
-  const PERIOD = 18;
+  const PERIOD = 10;
   const bounds = {
     canopy: { x: 380, y: 0, width: 1292, height: 490 },
     water: { x: 0, y: 565, width: 1080, height: 310 },
@@ -181,14 +181,15 @@ if (canvas && hero && landscape) {
     if (!canopyLayer) return;
     const region = bounds.canopy;
     context.save();
-    context.globalAlpha = 0.92;
+    context.globalAlpha = 0.86;
     const stripHeight = 12;
     for (let y = 0; y < region.height; y += stripHeight) {
       const height = Math.min(stripHeight, region.height - y);
       const depth = y / region.height;
       const sway =
-        Math.sin(seconds * 0.82 + y * 0.027) * (2.3 + depth * 3.7) +
-        Math.sin(seconds * 0.37 + y * 0.011) * (0.8 + depth * 1.5);
+        Math.sin(seconds * 0.82 + y * 0.027) * (5 + depth * 9) +
+        Math.sin(seconds * 0.37 + y * 0.011) * (2 + depth * 3);
+      const lift = Math.sin(seconds * 0.66 + y * 0.02) * (0.7 + depth * 1.6);
       context.drawImage(
         canopyLayer,
         0,
@@ -196,11 +197,110 @@ if (canvas && hero && landscape) {
         region.width,
         height,
         region.x + sway,
-        region.y + y,
+        region.y + y + lift,
         region.width,
         height,
       );
     }
+    context.restore();
+  }
+
+  function drawCanopyLight(seconds) {
+    const region = bounds.canopy;
+    const progress = (seconds * 0.12) % 1.25;
+    const lightX = region.x + region.width * (progress - 0.12);
+
+    context.save();
+    context.beginPath();
+    context.rect(region.x, region.y, region.width, region.height + 40);
+    context.clip();
+    context.globalCompositeOperation = "screen";
+    const light = context.createLinearGradient(
+      lightX - 250,
+      0,
+      lightX + 250,
+      region.height,
+    );
+    light.addColorStop(0, "rgba(255, 238, 178, 0)");
+    light.addColorStop(0.46, "rgba(255, 238, 178, 0.18)");
+    light.addColorStop(0.54, "rgba(255, 249, 207, 0.11)");
+    light.addColorStop(1, "rgba(255, 238, 178, 0)");
+    context.fillStyle = light;
+    context.fillRect(region.x, region.y, region.width, region.height + 40);
+    context.restore();
+  }
+
+  function drawCloudPuff(x, y, scale, opacity) {
+    context.save();
+    context.translate(x, y);
+    context.globalAlpha = opacity;
+    context.filter = "blur(10px)";
+    context.fillStyle = "rgba(222, 237, 215, 0.72)";
+    context.beginPath();
+    context.ellipse(0, 12 * scale, 118 * scale, 24 * scale, 0, 0, Math.PI * 2);
+    context.ellipse(
+      -68 * scale,
+      10 * scale,
+      52 * scale,
+      25 * scale,
+      0,
+      0,
+      Math.PI * 2,
+    );
+    context.ellipse(
+      -18 * scale,
+      -2 * scale,
+      66 * scale,
+      39 * scale,
+      0,
+      0,
+      Math.PI * 2,
+    );
+    context.ellipse(
+      48 * scale,
+      5 * scale,
+      54 * scale,
+      31 * scale,
+      0,
+      0,
+      Math.PI * 2,
+    );
+    context.fill();
+    context.filter = "blur(5px)";
+    context.fillStyle = "rgba(246, 247, 218, 0.42)";
+    context.beginPath();
+    context.ellipse(-24 * scale, 0, 74 * scale, 25 * scale, 0, 0, Math.PI * 2);
+    context.fill();
+    context.restore();
+  }
+
+  function drawCloudMotion(seconds) {
+    context.save();
+    context.beginPath();
+    context.moveTo(0, 0);
+    context.lineTo(520, 0);
+    context.lineTo(650, 80);
+    context.lineTo(780, 190);
+    context.lineTo(900, 300);
+    context.lineTo(760, 390);
+    context.lineTo(480, 470);
+    context.lineTo(0, 560);
+    context.closePath();
+    context.clip();
+    context.globalCompositeOperation = "screen";
+    const drift = (seconds * 0.045) % 1.35;
+    drawCloudPuff(
+      520 + drift * 550,
+      140 + Math.sin(seconds * 0.18) * 14,
+      1.25,
+      0.9,
+    );
+    drawCloudPuff(
+      420 + ((drift + 0.55) % 1.35) * 520,
+      275 + Math.sin(seconds * 0.15 + 2) * 16,
+      0.9,
+      0.82,
+    );
     context.restore();
   }
 
@@ -232,23 +332,23 @@ if (canvas && hero && landscape) {
 
   function robotPose(seconds) {
     const phase = ((seconds % PERIOD) + PERIOD) % PERIOD;
-    const home = [1328, 750];
-    const paper = [1248, 826];
+    const home = [1312, 604];
+    const paper = [1297, 660];
     let grip = home;
     let writing = false;
     let progress = 0;
 
-    if (phase < 2) {
+    if (phase < 0.4) {
       grip = home;
-    } else if (phase < 5) {
-      const amount = ease((phase - 2) / 3);
+    } else if (phase < 1.4) {
+      const amount = ease((phase - 0.4) / 1);
       grip = [lerp(home[0], paper[0], amount), lerp(home[1], paper[1], amount)];
-    } else if (phase < 12) {
+    } else if (phase < 5.8) {
       writing = true;
-      progress = ease((phase - 5) / 7);
-      grip = [paper[0] + Math.sin(progress * Math.PI * 4) * 28, paper[1]];
-    } else if (phase < 15) {
-      const amount = ease((phase - 12) / 3);
+      progress = ease((phase - 1.4) / 4.4);
+      grip = [paper[0] + Math.sin(progress * Math.PI * 4) * 34, paper[1]];
+    } else if (phase < 7) {
+      const amount = ease((phase - 5.8) / 1.2);
       grip = [lerp(paper[0], home[0], amount), lerp(paper[1], home[1], amount)];
     }
 
@@ -257,21 +357,21 @@ if (canvas && hero && landscape) {
 
   function drawWritingTrace(progress, opacity) {
     const points = [
-      [1218, 838],
-      [1240, 832],
-      [1261, 840],
-      [1284, 833],
-      [1307, 840],
+      [1238, 665],
+      [1260, 659],
+      [1282, 665],
+      [1304, 659],
+      [1326, 664],
     ];
     const distance = (points.length - 1) * progress;
     const segment = Math.min(points.length - 2, Math.floor(distance));
     const fraction = distance - segment;
 
     context.save();
-    context.globalCompositeOperation = "screen";
+    context.globalCompositeOperation = "source-over";
     context.globalAlpha = opacity;
-    context.strokeStyle = "rgba(255, 227, 157, 0.78)";
-    context.lineWidth = 2.2;
+    context.strokeStyle = "rgba(38, 53, 60, 0.86)";
+    context.lineWidth = 3.4;
     context.lineCap = "round";
     context.beginPath();
     context.moveTo(...points[0]);
@@ -290,16 +390,16 @@ if (canvas && hero && landscape) {
 
   function drawRobotCycle(seconds) {
     const state = robotPose(seconds);
-    const base = [1532, 874];
-    const elbow = [1453, 616];
+    const base = [1485, 440];
+    const elbow = [1365, 500];
     const pulse = 0.5 + Math.sin(seconds * 3.2) * 0.5;
 
     context.save();
     context.globalCompositeOperation = "screen";
     context.lineCap = "round";
     context.lineJoin = "round";
-    context.strokeStyle = `rgba(239, 246, 204, ${0.12 + pulse * 0.1})`;
-    context.lineWidth = 2.4;
+    context.strokeStyle = `rgba(239, 246, 204, ${0.46 + pulse * 0.2})`;
+    context.lineWidth = 5.2;
     context.beginPath();
     context.moveTo(...base);
     context.lineTo(...elbow);
@@ -312,14 +412,14 @@ if (canvas && hero && landscape) {
       0,
       state.grip[0],
       state.grip[1],
-      14,
+      28,
     );
-    glow.addColorStop(0, `rgba(255, 223, 125, ${0.4 + pulse * 0.22})`);
-    glow.addColorStop(0.32, `rgba(255, 204, 92, ${0.16 + pulse * 0.1})`);
+    glow.addColorStop(0, `rgba(255, 223, 125, ${0.78 + pulse * 0.18})`);
+    glow.addColorStop(0.32, `rgba(255, 204, 92, ${0.42 + pulse * 0.2})`);
     glow.addColorStop(1, "rgba(255, 204, 92, 0)");
     context.fillStyle = glow;
     context.beginPath();
-    context.arc(state.grip[0], state.grip[1], 14, 0, Math.PI * 2);
+    context.arc(state.grip[0], state.grip[1], 22, 0, Math.PI * 2);
     context.fill();
     context.restore();
 
@@ -330,6 +430,7 @@ if (canvas && hero && landscape) {
     if (failed || !viewport.width || !viewport.height) return;
     clearCanvas();
     if (reducedMotion.matches) return;
+    drawCloudMotion(seconds);
     drawCanopyMotion(seconds);
     drawWaterMotion(seconds);
     drawRobotCycle(seconds);

@@ -17,6 +17,7 @@ test("hero scene animates source-anchored layers from one canonical painting", (
   assert.match(scene, /waitForPoster/);
   assert.match(scene, /prefers-reduced-motion/);
   assert.match(scene, /createSourceLayer/);
+  assert.match(scene, /drawCloudMotion/);
   assert.match(scene, /drawCanopyMotion/);
   assert.match(scene, /drawWaterMotion/);
   assert.match(scene, /drawRobotCycle/);
