@@ -16,10 +16,14 @@ test("hero scene is a layered illustrated diorama with a poster fallback", () =>
   assert.match(scene, /getContext\("2d"\)/);
   assert.match(scene, /hero\.dataset\.sceneBackdrop/);
   assert.match(scene, /prefers-reduced-motion/);
-  assert.match(scene, /drawMist|drawSunBloom|drawSparkles/);
-  assert.match(scene, /drawAnimatedBackdrop/);
+  assert.match(scene, /drawBackdrop/);
+  assert.match(scene, /drawAmbientLight/);
+  assert.match(scene, /drawWaterGlints/);
+  assert.match(scene, /requestAnimationFrame/);
+  assert.match(scene, /hero\.classList\.add\("scene-ready"\)/);
   assert.match(scene, /requested !== null && Number\.isFinite\(requested\)/);
   assert.match(scene, /URLSearchParams\(window\.location\.search\)/);
+  assert.doesNotMatch(scene, /drawLeaves|drawScreenOverlay|drawInk/);
   assert.match(homepage, /class="landscape"/);
   assert.match(homepage, /class="scene-poster"|id="scene-poster"/);
   assert.match(homepage, /scene-poster\.jpg/);

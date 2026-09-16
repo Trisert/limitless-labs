@@ -193,6 +193,13 @@ button:focus-visible {
   z-index: 1;
   display: block;
   pointer-events: none;
+  opacity: 0;
+}
+.hero.scene-ready .landscape canvas {
+  opacity: 1;
+}
+.hero.scene-fallback .landscape canvas {
+  display: none;
 }
 .hero-shade {
   z-index: 2;
@@ -287,7 +294,9 @@ button:focus-visible {
   border: 1px solid rgb(255 255 255 / 20%);
   border-radius: 999px;
   pointer-events: none;
-  animation: dismiss-loader 0s 6s forwards;
+}
+.scene-loader[hidden] {
+  display: none;
 }
 .scene-loader-dot {
   width: 0.8rem;
@@ -300,11 +309,6 @@ button:focus-visible {
 @keyframes loader-spin {
   to {
     transform: rotate(360deg);
-  }
-}
-@keyframes dismiss-loader {
-  to {
-    visibility: hidden;
   }
 }
 
