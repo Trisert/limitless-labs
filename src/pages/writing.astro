@@ -1,0 +1,46 @@
+---
+import Base from "../layouts/Base.astro";
+import { getCollection } from "astro:content";
+
+const base = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/`;
+const posts = (await getCollection("posts", ({ data }) => !data.draft)).sort(
+  (a, b) =>
+    b.data.date.valueOf() - a.data.date.valueOf() || a.id.localeCompare(b.id),
+);
+const formatDate = (date: Date) =>
+  date.toISOString().slice(0, 10).split("-").reverse().join(".");
+---
+
+<Base
+  title="Field notes — Limitless Labs"
+  description="Measured notes on space systems, edge AI, and real constraints."
+>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <main class="post" id="main-content">
+    <div class="wrap">
+      <p class="back"><a href={`${base}`}>← home</a></p>
+      <div class="prose">
+        <p class="log-date">FIELD NOTES</p>
+        <h1>Field notes</h1>
+        <p>Things measured before being written down.</p>
+        <ul class="notes-index">
+          {
+            posts.map((post) => (
+              <li>
+                <time datetime={post.data.date.toISOString().slice(0, 10)}>
+                  {formatDate(post.data.date)}
+                </time>
+                <a href={`${base}writing/${post.id}.html`}>{post.data.title}</a>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+    </div>
+  </main>
+  <footer>
+    <div class="wrap article-footer">
+      Limitless Labs · <a href={`${base}`}>home</a>
+    </div>
+  </footer>
+</Base>

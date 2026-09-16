@@ -1,0 +1,39 @@
+---
+import Base from "../layouts/Base.astro";
+const base = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/`;
+---
+
+<Base
+  title="Privacy Policy — Limitless Labs"
+  description="Privacy policy for Limitless Labs."
+  bodyClass="post"
+>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <main id="main-content">
+    <div class="wrap">
+      <p class="log-date">LEGAL</p>
+      <div class="prose">
+        <h1>Privacy Policy</h1>
+        <p>
+          This page describes how Limitless Labs collects and handles
+          information when you visit this site.
+        </p>
+        <h2>No tracking</h2>
+        <p>
+          This site does not use analytics or advertising cookies. No tracking
+          scripts are loaded. The site does not send visitor data to a backend.
+        </p>
+        <h2>Contact</h2>
+        <p>
+          For any privacy-related question, reach out at <a
+            href="mailto:hello@limitless-labs.dev">hello@limitless-labs.dev</a
+          >.
+        </p>
+        <p class="article-back">
+          <a href={`${base}#writing`}>← back to field notes</a>
+        </p>
+      </div>
+    </div>
+  </main>
+  <footer><div class="wrap article-footer">© 2026 Limitless Labs</div></footer>
+</Base>

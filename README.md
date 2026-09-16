@@ -1,39 +1,63 @@
 # Limitless Labs
 
-A field-journal of experiments, research, and real measurements on self-hosting,
-low-power computing, and AI-on-the-edge — run from a Raspberry Pi 3 (906 MB RAM).
+Personal portfolio for Nicola Destro: aerospace software, local AI systems, and field notes measured against real constraints.
 
-This is **not a tutorial collection.** It is a log of what we actually did, measured,
-and concluded while working together. Every entry is dated, sourced, and grounded in
-real hardware — the kind of first-hand experience that survives the shift from
-"search for an answer" to "ask an agent."
+## Stack
 
-## Why this exists
+- Astro static output with an original painted hero and a Canvas 2D motion layer (drifting mist, sun bloom, cloud shadows, stream sparkle, canopy wind light, and a seamless low-amplitude camera drift across the complete painting).
+- The hero painting is generated with the free, keyless Pollinations endpoint and exported at 2048px by `tools/fetch_backdrop.py`; the no-JS poster is rendered from the live scene by `tools/make_poster.py`. Both assets live in `public/art/`.
+- Only one raster ships in the hero (the painting). Everything animated on top is vector or gradient work drawn at device resolution, so it stays sharp on any display.
+- Markdown posts in `src/content/posts/` rendered to `/writing/<slug>.html`.
+- No runtime API, analytics, cookies, remote fonts, or CDN dependencies.
+- GitHub Pages deployment through `.github/workflows/pages.yml`.
 
-Search traffic to how-to content is collapsing:
-- Zero-click results now exceed **two-thirds** of Google searches (SparkToro, 2026).
-- AI Overviews cut the #1-position click-through rate by **~58%** (Ahrefs, Feb 2026).
-- Organic traffic is estimated down **15–25%** (Bain & Co, 2025).
+## Hero artwork
 
-So we don't write "how-to" posts an LLM can answer in chat. We publish **our own
-research and measurements** — experience, statistics, and conclusions that generative
-engines cite (see GEO: Aggarwal et al., arXiv:2311.09735).
+```sh
+python3 tools/fetch_backdrop.py            # regenerate public/art/backdrop-ai.jpg
+npm run build && python3 tools/make_poster.py   # regenerate public/art/scene-poster.jpg
+```
 
-## Structure
+`tools/fetch_backdrop.py` calls the anonymous Pollinations tier, which returns
+1024x576 regardless of the requested size — that is a hard free-tier limit, not
+a bug. The export pipeline therefore upscales to 2048x1152, sharpens and adds
+fine canvas grain. Any higher-resolution or prompt-adherent provider can replace
+the `fetch()` function without touching the scene code.
 
-- `notes/` — dated research entries (the core of the repo).
-- `tools/` — small utilities we actually use on the Pi (not tutorials).
+Motion is tuned per painting through the `SCENE` block in
+`src/scripts/hero-scene.mjs` (sun position, stream rows, canopy zone, and the
+laptop-screen quad used when a painting contains a display).
 
-## Hardware baseline (measured 2026-07-18)
+## Local development
 
-| Resource | Value |
-|----------|-------|
-| Board | Raspberry Pi 3 Model B+ (aarch64) |
-| OS | Debian 12 (bookworm) |
-| Total RAM | 906 MB (330 MB available under load) |
-| Swap | 511 MB |
-| Free disk | 5.9 GB / 15 GB |
-| Docker | 20.10.24 |
-| Tailscale | active (100.73.100.125) |
+Requires Node 24 or newer:
 
-License: MIT.
+```sh
+npm ci
+npm run dev
+npm test
+npm run build
+npm run preview
+```
+
+The production path is `/limitless-labs/`, matching the project-site URL:
+`https://trisert.github.io/limitless-labs/`.
+
+## Content
+
+Add a Markdown file under `src/content/posts/` with frontmatter:
+
+```yaml
+---
+title: A measured title
+date: 2026-09-09
+category: systems
+description: A short field-note summary.
+---
+```
+
+The homepage and field-note index sort published posts deterministically by date and slug. Drafts stay out of the build.
+
+## Deployment
+
+The repository must use **GitHub Actions** as its Pages source. In the repository settings, set Pages → Build and deployment → Source to `GitHub Actions`; the workflow builds `dist/` and deploys it. The existing project-site prefix is configured in `astro.config.mjs` and must not be removed.

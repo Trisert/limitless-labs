@@ -1,0 +1,25 @@
+{
+  "name": "limitless-labs",
+  "type": "module",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "test": "node --test tests/*.test.mjs",
+    "format": "prettier --plugin=prettier-plugin-astro --write \"src/layouts/**/*.astro\" \"src/pages/**/*.astro\" \"src/pages/**/*.ts\" \"src/scripts/**/*.mjs\" \"src/styles/**/*.css\" \"src/content.config.ts\" \"src/env.d.ts\" \"tests/**/*.mjs\" \"astro.config.mjs\" \"package.json\" \".github/workflows/pages.yml\"",
+    "format:check": "prettier --plugin=prettier-plugin-astro --check \"src/layouts/**/*.astro\" \"src/pages/**/*.astro\" \"src/pages/**/*.ts\" \"src/scripts/**/*.mjs\" \"src/styles/**/*.css\" \"src/content.config.ts\" \"src/env.d.ts\" \"tests/**/*.mjs\" \"astro.config.mjs\" \"package.json\" \".github/workflows/pages.yml\""
+  },
+  "dependencies": {
+    "astro": "7.3.1"
+  },
+  "devDependencies": {
+    "prettier": "3.9.6",
+    "prettier-plugin-astro": "0.14.1"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

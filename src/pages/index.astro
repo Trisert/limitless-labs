@@ -1,0 +1,234 @@
+---
+import Base from "../layouts/Base.astro";
+import { getCollection } from "astro:content";
+
+const base = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/`;
+const publishedPosts = (
+  await getCollection("posts", ({ data }) => !data.draft)
+).sort(
+  (a, b) =>
+    b.data.date.valueOf() - a.data.date.valueOf() || a.id.localeCompare(b.id),
+);
+const summaries = new Map([
+  [
+    "2026-07-20-living-on-a-raspberry-pi",
+    "Field notes from a Pi 3 B+, 906 MB of RAM, and the discipline of measuring the constraint.",
+  ],
+  [
+    "2026-07-20-starlink-v3-integration",
+    "Why the satellite is not the point: integration, link budgets, and the systems around it.",
+  ],
+]);
+const formatDate = (date: Date) =>
+  date.toISOString().slice(0, 10).split("-").reverse().join(".");
+---
+
+<Base bodyClass="portfolio">
+  <a class="skip-link" href="#work">Skip to work</a>
+  <header class="site-header">
+    <a class="wordmark" href={`${base}#hero`} aria-label="Nicola Destro, home"
+      >nicola<span>destro</span><b>.</b></a
+    >
+    <nav aria-label="Main navigation">
+      <a class="nav-contact" href="mailto:hello@limitless-labs.dev"
+        >Say hello <span aria-hidden="true">↗</span></a
+      >
+    </nav>
+  </header>
+
+  <main>
+    <section
+      class="hero"
+      id="hero"
+      aria-labelledby="hero-heading"
+      data-scene-backdrop={`${base}art/backdrop.jpg`}
+    >
+      <div class="landscape" aria-hidden="true">
+        <img
+          id="scene-poster"
+          src={`${base}art/scene-poster.jpg`}
+          alt=""
+          fetchpriority="high"
+          width="1672"
+          height="941"
+        />
+        <canvas class="hero-canvas" id="orbitCanvas"></canvas>
+      </div>
+      <div class="hero-shade" aria-hidden="true"></div>
+      <div class="scene-loader" role="status">
+        <span class="scene-loader-dot" aria-hidden="true"></span>Loading
+        illustrated scene…
+      </div>
+      <div class="hero-copy">
+        <p class="eyebrow">Aerospace · AI on the edge · Running</p>
+        <h1 id="hero-heading">Flight software that has to be right.</h1>
+        <p class="hero-description">
+          A bit of space, a bit of AI, a bit of running.<br />
+          Building systems that work before they leave the ground — and after the
+          demo ends.
+        </p>
+        <a class="hero-cta" href="#work"
+          >Explore my work <span aria-hidden="true">↓</span></a
+        >
+      </div>
+      <div class="hero-readout" aria-hidden="true">
+        <span>ORBITAL SYSTEMS</span><span>LOCAL INFERENCE</span><span
+          >906 MB / REAL CONSTRAINTS</span
+        >
+      </div>
+    </section>
+
+    <div class="page-content">
+      <section id="work" class="work-section" aria-labelledby="work-heading">
+        <div class="section-intro">
+          <p class="eyebrow">01 / WORK</p>
+          <h2 id="work-heading">A few things<br />I'm building.</h2>
+          <p>
+            Space systems, local AI, and software that has to survive contact
+            with hardware. I like figuring out how the pieces fit together.
+          </p>
+        </div>
+        <div class="work-list">
+          <div class="work-item">
+            <span class="work-number">01</span>
+            <div>
+              <span class="project-type">SPACE · FLIGHT SOFTWARE</span>
+              <h3>ESA collaboration <span aria-hidden="true">↗</span></h3>
+              <p>
+                Flight software developed in collaboration with ESA. Details
+                stay NDA-safe; the standard is simple: it has to be right before
+                it leaves the ground.
+              </p>
+            </div>
+          </div>
+          <a
+            class="work-item"
+            href={`${base}writing/2026-07-20-living-on-a-raspberry-pi.html`}
+          >
+            <span class="work-number">02</span>
+            <div>
+              <span class="project-type">AI · EDGE SYSTEMS</span>
+              <h3>
+                Raspberry Pi agent fleet <span aria-hidden="true">↗</span>
+              </h3>
+              <p>
+                Local agents on a Pi 3 B+ with 906 MB of RAM. Debian 12, NixOS,
+                and measured constraints instead of slideware.
+              </p>
+            </div>
+          </a>
+          <a
+            class="work-item"
+            href={`${base}writing/2026-07-20-starlink-v3-integration.html`}
+          >
+            <span class="work-number">03</span>
+            <div>
+              <span class="project-type">SPACE · SYSTEMS ANALYSIS</span>
+              <h3>Starlink V3 / GEO notes <span aria-hidden="true">↗</span></h3>
+              <p>
+                Technical field notes on satellite integration, link budgets,
+                and the systems around the satellite.
+              </p>
+            </div>
+          </a>
+        </div>
+      </section>
+
+      <section
+        id="writing"
+        class="writing-section"
+        aria-labelledby="writing-heading"
+      >
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">02 / FIELD NOTES</p>
+            <h2 id="writing-heading">
+              Things I measured<br />before writing down.
+            </h2>
+          </div>
+          <a class="text-link" href={`${base}writing.html`}
+            >All field notes <span aria-hidden="true">↗</span></a
+          >
+        </div>
+        <div class="log-list">
+          {
+            publishedPosts.map((post) => (
+              <a class="log-row" href={`${base}writing/${post.id}.html`}>
+                <time datetime={post.data.date.toISOString().slice(0, 10)}>
+                  {formatDate(post.data.date)}
+                </time>
+                <div>
+                  <h3>{post.data.title}</h3>
+                  <p>{post.data.description ?? summaries.get(post.id) ?? ""}</p>
+                </div>
+                <span class="log-arrow" aria-hidden="true">
+                  ↗
+                </span>
+              </a>
+            ))
+          }
+        </div>
+      </section>
+
+      <section class="now-section" aria-labelledby="now-heading">
+        <div>
+          <p class="eyebrow">03 / NOW</p>
+          <h2 id="now-heading">What I'm<br />exploring.</h2>
+        </div>
+        <dl>
+          <div>
+            <dt>Learning</dt>
+            <dd>
+              <em>Flight software, Rust, and systems</em> that stay understandable
+              under pressure.
+            </dd>
+          </div>
+          <div>
+            <dt>Exploring</dt>
+            <dd>Local LLMs, autonomous agents, and machines that move.</dd>
+          </div>
+          <div>
+            <dt>Running</dt>
+            <dd>A bit of sport, a bit of distance, no dashboard theatre.</dd>
+          </div>
+        </dl>
+      </section>
+
+      <footer id="contact" class="portfolio-footer">
+        <div>
+          <p>Have an idea that has to work?</p>
+          <a class="footer-hello" href="mailto:hello@limitless-labs.dev"
+            >Let's talk.<span aria-hidden="true">↗</span></a
+          >
+        </div>
+        <div class="footer-bottom">
+          <span>Nicola Destro · Limitless Labs</span>
+          <div>
+            <a href="https://github.com/Trisert" target="_blank" rel="noopener"
+              >GitHub ↗</a
+            >
+            <a href="https://x.com/ncldstr" target="_blank" rel="noopener"
+              >X ↗</a
+            >
+            <a
+              href="https://huggingface.co/Trisert"
+              target="_blank"
+              rel="noopener">Hugging Face ↗</a
+            >
+            <a href="mailto:hello@limitless-labs.dev">Email ↗</a>
+          </div>
+          <a href="#hero">Back to top ↑</a>
+        </div>
+        <div class="footer-legal">
+          <a href={`${base}privacy.html`}>Privacy</a><span
+            >Built on Earth, aimed at orbit.</span
+          >
+        </div>
+      </footer>
+    </div>
+  </main>
+</Base>
+
+<script>
+  import "../scripts/hero-scene.mjs";
+</script>
