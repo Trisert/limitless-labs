@@ -26,7 +26,7 @@ test("hero scene is a transparent atmospheric enhancement over one canonical pai
   assert.match(scene, /URLSearchParams\(window\.location\.search\)/);
   assert.doesNotMatch(
     scene,
-    /drawBackdrop|drawLeaves|drawScreenOverlay|drawInk|drawMist/,
+    /drawImage|drawBackdrop|drawLeaves|drawScreenOverlay|drawInk|drawMist/,
   );
   assert.match(homepage, /class="landscape"/);
   assert.match(homepage, /class="scene-poster"|id="scene-poster"/);

@@ -135,6 +135,33 @@ if (canvas && hero && landscape) {
     canopy.addColorStop(1, "rgba(211, 245, 196, 0)");
     context.fillStyle = canopy;
     context.fillRect(0, 0, LOGICAL.width, LOGICAL.height * 0.74);
+
+    // A broad, slow shaft of light crosses only the painted canopy. It gives the
+    // scene a readable beat without moving the tree, typography or workbench.
+    const sweep = (seconds * 0.035) % 1;
+    const beamX = LOGICAL.width * (0.42 + sweep * 0.64);
+    context.save();
+    context.beginPath();
+    context.moveTo(LOGICAL.width * 0.34, 0);
+    context.lineTo(LOGICAL.width, 0);
+    context.lineTo(LOGICAL.width, LOGICAL.height * 0.6);
+    context.lineTo(LOGICAL.width * 0.77, LOGICAL.height * 0.5);
+    context.lineTo(LOGICAL.width * 0.61, LOGICAL.height * 0.38);
+    context.lineTo(LOGICAL.width * 0.47, LOGICAL.height * 0.34);
+    context.closePath();
+    context.clip();
+    const beam = context.createLinearGradient(
+      beamX - LOGICAL.width * 0.16,
+      0,
+      beamX + LOGICAL.width * 0.16,
+      LOGICAL.height * 0.56,
+    );
+    beam.addColorStop(0, "rgba(255, 244, 190, 0)");
+    beam.addColorStop(0.5, `rgba(255, 244, 190, ${0.1 + pulse * 0.06})`);
+    beam.addColorStop(1, "rgba(255, 244, 190, 0)");
+    context.fillStyle = beam;
+    context.fillRect(0, 0, LOGICAL.width, LOGICAL.height * 0.66);
+    context.restore();
     context.restore();
   }
 
@@ -142,7 +169,7 @@ if (canvas && hero && landscape) {
     context.save();
     context.globalCompositeOperation = "screen";
     context.lineCap = "round";
-    context.lineWidth = 1.35;
+    context.lineWidth = 2.2;
     context.beginPath();
     context.moveTo(LOGICAL.width * 0.08, LOGICAL.height * 0.55);
     context.bezierCurveTo(
@@ -182,7 +209,7 @@ if (canvas && hero && landscape) {
       const head = from + (to - from) * clamp(start);
       const tail = from + (to - from) * clamp(end);
       const fade = Math.sin(Math.PI * clamp((progress + 0.12) % 1));
-      const alpha = 0.06 + fade * 0.1;
+      const alpha = 0.11 + fade * 0.13;
 
       context.strokeStyle = `rgba(233, 255, 231, ${alpha})`;
       context.beginPath();
